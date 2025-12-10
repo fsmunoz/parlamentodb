@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: parlamentodb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parlamentodb
+  namespace: parlamentodb
+spec:
+  selector:
+    app: parlamentodb
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+# ===============================
+# SECURITY HEADERS MIDDLEWARE
+# ===============================
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: parlamentodb
+spec:
+  headers:
+    frameDeny: true
+    contentTypeNosniff: true
+    browserXssFilter: true
+    referrerPolicy: "no-referrer"
+    customResponseHeaders:
+      X-Frame-Options: "DENY"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+---
+# ===============================
+# RATE LIMIT MIDDLEWARE
+# ===============================
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: parlamentodb
+spec:
+  rateLimit:
+    average: 100       # average requests per second
+    burst: 50          # burst capacity
+---
+# ===============================
+# INGRESS ROUTE
+# ===============================
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: parlamentodb
+  namespace: parlamentodb
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`api.parlamentodb.pt`) && PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: parlamentodb
+          port: 8000
+      middlewares:
+        - name: security-headers
+        - name: rate-limit
+    - match: Host(`api.parlamentodb.pt`) && Path(`/health`)
+      kind: Rule
+      services:
+        - name: parlamentodb
+          port: 8000
+      middlewares:
+        - name: rate-limit

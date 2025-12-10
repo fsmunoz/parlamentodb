@@ -1,0 +1,115 @@
+---
+# Namespace (optional - use default if preferred)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: parlamentodb
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parlamentodb-api
+  namespace: parlamentodb
+  labels:
+    app: parlamentodb
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: parlamentodb
+  template:
+    metadata:
+      labels:
+        app: parlamentodb
+    spec:
+      containers:
+      - name: api
+        image: parlamentodb:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PORT
+          value: "8000"
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        hostPath:
+          path: /opt/parlamentodb/data
+          type: Directory
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: parlamentodb-api
+  namespace: parlamentodb
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: parlamentodb
+---
+# Ingress (optional - for external access)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: parlamentodb-ingress
+  namespace: parlamentodb
+  annotations:
+    # Uncomment if using cert-manager for HTTPS
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  rules:
+  - host: parlament.example.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: parlamentodb-api
+            port:
+              number: 80
+  # Uncomment for HTTPS with cert-manager
+  # tls:
+  # - hosts:
+  #   - parlament.example.com
+  #   secretName: parlamentodb-tls

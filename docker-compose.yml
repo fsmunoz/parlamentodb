@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: parlament-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount data directory for hot-reload during development
+      - ./data:/app/data:ro
+      # Mount app code for development (comment out for production)
+      - ./app:/app/app:ro
+    environment:
+      - PORT=8000
+      - LOG_LEVEL=INFO
+      - DEFAULT_LIMIT=50
+      - MAX_LIMIT=500
+      # Override with .env file
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Caddy reverse proxy for HTTPS (production single-server deployment)
+  # Uncomment for production use
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: parlament-caddy
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - api
+  #   restart: unless-stopped
+
+# volumes:
+#   caddy_data:
+#   caddy_config:
