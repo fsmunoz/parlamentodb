@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Poetry
+# (poetry.lock should be committed for reproducible builds), removed.
+
+
+# Data 
+data/silver/*.parquet
+data/bronze/
+*.tmp
+
+# Logs
+*.log
+
+# Samples
+samples/
+# Old stuff
+.old/

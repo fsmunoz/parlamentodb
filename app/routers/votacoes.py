@@ -1,5 +1,9 @@
 """
 Votacoes (votes) endpoints.
+
+Frederico Muñoz <fsmunoz@gmail.com>
+
+Individual voting sessions, always occur inside events.
 """
 
 from datetime import date
@@ -23,6 +27,7 @@ def list_votacoes(
     legislatura: str | None = Query(None, description="Filter by legislature (L15, L16, L17)"),
     ini_id: str | None = Query(None, description="Filter by initiative ID"),
     resultado: str | None = Query(None, description="Filter by result (Aprovado, Rejeitado, etc.)"),
+    q: str | None = Query(None, description="Search in initiative title (ini_titulo). Case-insensitive substring match."),
     data_desde: date | None = Query(None, description="Minimum vote date (YYYY-MM-DD)"),
     data_ate: date | None = Query(None, description="Maximum vote date (YYYY-MM-DD)"),
     partido_favor: str | None = Query(None, description="Filter by party voting in favor (e.g., PS, PSD). Case-insensitive."),
@@ -45,9 +50,11 @@ def list_votacoes(
     **Case-Insensitive Parameters:**
     - Legislature codes are case-insensitive (e.g., 'l17', 'L17' both accepted, normalized to 'L17')
     - Party codes are case-insensitive (e.g., 'ps', 'PS' both accepted, normalized to 'PS')
-
+    - Query to search in the title is also case-insensitive (uses ILIKE)
+    
     Party filters match exact party codes (PS, PSD, etc.).
-    Note: Individual Ninsc members are stored with full names (e.g., "António Maló (Ninsc)").
+    Note: Individual Ninsc members are stored with full names (e.g., "António Maló (Ninsc)")., this is
+    important due to the way things work in the Portuguese parliament.
 
     Default limit is 50 records, maximum is 500.
     """
@@ -69,6 +76,7 @@ def list_votacoes(
         qb.add_list_contains("detalhe_parsed.a_favor", partido_favor, "partido_favor")
         qb.add_list_contains("detalhe_parsed.contra", partido_contra, "partido_contra")
         qb.add_list_contains("detalhe_parsed.abstencao", partido_abstencao, "partido_abstencao")
+        qb.add_text_search("ini_titulo", q)
 
         where_sql = qb.build_where()
         params = qb.get_params()

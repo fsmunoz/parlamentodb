@@ -35,8 +35,7 @@ SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
 LEGISLATURES: dict[str, LegislatureConfig] = {
     "L17": {
-        "url": "https://app.parlamento.pt/webutils/docs/doc.txt?path=dVKsAZ0sC%2fPjvBRSDh%2bcMRq0KX%2fMC0XZsmETg717LK%2foOpsU9UpvKw%2bXKIAMKiiI3RIIndL0CPKqP%2b5tz%2fu%2bdOxNiWdBVQl7hsx3ewC2Ex6G0gX5p%2f0vL2b4HsSfkmskT1zOosnK6e%2bySmWfVU8g4VnQRnwmkopoEKK1AKoCng74eJYNtvIegF5qaiAhJZ22T0Gb3wP54CqVZa6Ds3wlLcujRsdP1dKCfw3olRDx4XSqVxF0XsGVYeBvdONi%2fy%2bvepRb7%2fRo2J4u2k5p%2bc2sz2NWV%2b6Wu2PlJHQk1PyfdfjNwGFNQoJ30JbJuH%2bjlK1zA1%2b5M5WP0FwwMJffUIHqNTBOo8wPvQegcJXRYtxejkQ%3d&fich=IniciativasXVII_json.txt&Inline=true",
-        "info_base_url": "https://app.parlamento.pt/webutils/docs/doc.txt?path=AOlYo9f%2b%2bgJTKQdX9utiBMg7xBj%2fod%2ba%2fz0yyYjkVesKs%2bJPIKoQTAUvlKF8wLxwr%2b7glLsIheHB53N690CyV5osebZNp5OT6mklryDt1PK7ARHgT9zVFFXt%2ffHrX8qeeiVanSx1DnaXMLsQnfoyg7WQceVwlJX66%2bWMZ0cALP3O7e41domjqwCtaBhVYkkklWUEp3LHlGKJISqqD72oqdkjUnnPihsI2TUhaC2Bxu7ZpSSzVwjUHsEiSfBdMryb8CLwknp6Fd2axRp5F2CJqQDofHCQxVYYmtaP5xvNCvgCOU2TzM5UkftUux%2fXUe5Govon31arSHtMGBNebOYzoUcaDzaRTZF0ucBmZ%2fl5CyQaWLSct383Xg4EbjgGt1HH&fich=InformacaoBaseXVII_json.txt&Inline=true",
+        "url": "https://app.parlamento.pt/webutils/docs/doc.txt?path=vT4NKYCAcAkVhsxkek0X9GR7eZ0OofLhvaamIHFKZGIIYlhnxu7zKIsblH59KL72h98Zu1N1YTqN8DXZMgmt3EbdPgzlwhrmIMsaAAVbmHdJph0ajupa9JllbEogo%2fqScLfsVIOicGp1PUvXnG1iXa7YUCL7474EaFm4dv0QL6fNQlcFkI97C0SXv5ry3OgJC8HCmkJqINrPay1OF9uNI4iJaHCchWhK0Z2ojcLFwyJz7YF0bimXQgilgr3eE5OFAFyTax77Lv8ioecHw7ZXt%2fJppcfvF0%2bPRnNoPelExY4Q36mLd%2fmOQxfNwa3clarGoyTjcrzuDlexcc%2bpWM0RUy51EQt2FjJqLFwjbLFDw2E%3d&fich=IniciativasXVII_json.txt&Inline=true",
         "name": "XVII Legislatura",
         "start_date": "2025-06-03",
     },

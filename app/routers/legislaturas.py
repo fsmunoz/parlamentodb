@@ -1,5 +1,9 @@
 """
 Legislaturas (legislature metadata) endpoints.
+
+Frederico Muñoz <fsmunoz@gmail.com>
+
+Fundamental information about the legislature.
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -26,7 +30,6 @@ def list_legislaturas(
     List all available legislatures.
 
     Returns basic information about each legislature including dates and counts.
-    Now returns paginated response in standard APIResponse format.
     """
     # Validate inputs
     limit, offset = validate_pagination(limit, offset)
@@ -102,10 +105,10 @@ def get_legislatura(
     - Legislature details (dates, ID)
     - List of all deputies
     - Parliamentary groups
-    - Electoral districts
+    - Electoral districts (círculos)
     - Legislative sessions
 
-    Note: Detailed metadata is only available for legislatures with InformacaoBase data (L15, L16, and L17).
+    Note: Detailed metadata is only available for legislatures with InformacaoBase data in the config file.
     """
     try:
         query = "SELECT * FROM info_base WHERE legislatura = $legislatura"

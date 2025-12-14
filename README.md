@@ -3,19 +3,34 @@
 API REST para acesso estruturado aos dados disponibilizados pelo Parlamento, incluíndo iniciativas,
 votações, deputados, partidos, círculos eleitorais.
 
+Disponível em: https://api.votoaberto.org
+
 *REST API providing structured access to Portuguese Parliament data: legislative initiatives, voting
 records, deputies, parties, and electoral circles.*
+
+This project is the core component behind http://api.votoaberto.org
+
+![](docs/apidocs.png)
 
 ## Features
 
 * **17+ REST API Endpoints** - Initiatives, votes, deputies, parties, circles... the list will grow.
-* **Filtering** - By date, party, type, author, and more (depending on the endpoint). Covers the most common tasks.
+* **Filtering** - By date, party, type, author, and more (depending on the endpoint). Covers the most common tasks, including searching within titles.
 * **Fast queries** (hopefully). DuckDB on Parquet files is quite speedy, with <100ms query times for all tested queries.
 * **OpenAPI documentation** - Interactive Swagger UI + ReDoc
 * **Data validation** - Pydantic validation on requests/responses
 * **Pagination** - Offset-based approach (max 500 per page)
 * **Docker ready** - `docker-compose` manifest included.
 * **Tests** -  Comprehensive test coverage
+
+
+Since an API is not something that makes good animations, here is one from the first client that
+uses this API, **[ParlaTUI](https://codeberg.org/fsm/parlatui/)** - a TUI explorer for parliamentary
+data:
+
+![](docs/parlatui.gif)
+
+
 
 ## General approach and technology stack
 
@@ -25,7 +40,6 @@ converted to Parquet. DuckDB is used for querying.
 
 The information made available is an extended subset of the one contained in the source files; more
 can be added in the future.
-
 
 ## Quick start
 
@@ -145,23 +159,26 @@ As mentioned, FastAPI is the core component used, and brings with it several oth
 - **Parquet** - Columnar storage format (~26x compression vs JSON)
 - **Poetry** - Dependency management
 
-
-
 ### ETL and data flow
 
 The API uses DuckDB to query the "silver" datasets (Parquet created from the original JSON):
 
 ```
        Open Data (JSON)
-             ↓
+             |
+             v
        ETL Pipeline (fetch + transform)
-             ↓
+             |
+             v
        Parquet Files (data/silver/*.parquet)
-             ↓
+             |
+             v
        DuckDB Queries
-             ↓
+             |
+             v
        FastAPI Endpoints
-             ↓
+             |
+             v
        JSON Responses
 ```
 
@@ -201,13 +218,12 @@ make test-quick
 poetry run pytest --cov=app tests/
 ```
 
-
-
 ## ETL Pipeline
 
 The API serves data processed through an ETL pipeline that:
+
 1. Fetches JSON from Portuguese Parliament Open Data
-2. Normalizes field names (PascalCase → snake_case)
+2. Normalizes field names (PascalCase -> snake_case)
 3. Converts to Parquet format
 4. Adds metadata (legislature, etl_timestamp)
 
@@ -228,8 +244,8 @@ poetry run python -m etl.transform
 
 **Bronze Layer** (`data/bronze/`):
 - Raw JSON downloads from parlamento.pt
-- Complete preservation of source data
-- Files: `iniciativas_l17.json`, `votacoes_l17.json`, etc.
+- Complete preservation of source data, as-is.
+- Files: `iniciativas_l17.json`, etc.
 
 **Silver Layer** (`data/silver/`):
 - Normalized Parquet files
@@ -266,6 +282,9 @@ LEGISLATURES = {
 
 ## Project Structure
 
+This will likely be different due to ongoing changes, but for now it serves the purpose of showing
+what goes where:
+
 ```
 parlamentodb/
 ├── app/                      # FastAPI application
@@ -283,75 +302,60 @@ parlamentodb/
 │   └── models/              # Pydantic response models
 ├── etl/                     # ETL pipeline
 │   ├── fetch.py            # Download JSON from parlamento.pt
-│   ├── transform.py        # JSON → Parquet transformation
+│   ├── transform.py        # JSON -> Parquet transformation
 │   └── schema.py           # Field name mappings
 ├── data/
 │   ├── bronze/             # Raw JSON files
 │   └── silver/             # Normalized Parquet files
-├── tests/                  # Test suite (33 tests)
+├── tests/                  # Test suite 
 ├── docker-compose.yml      # Local deployment
 ├── Dockerfile              # Production deployment
 ├── pyproject.toml          # Poetry dependencies
 └── README.md
 ```
 
----
-
-## Roadmap
-
-✅ **Phase 1: ETL Pipeline** (Complete)
-- JSON fetching with retry logic
-- Schema normalization
-- Parquet conversion
-- 26x compression achieved
-
-✅ **Phase 2: REST API** (Complete)
-- 17+ endpoints across 7 routers
-- Advanced filtering (date, party, author, type)
-- Pagination
-- OpenAPI documentation
-- Docker deployment
-
-⏳ **Phase 3: Additional Datasets** (In Progress)
-- Deputy information ✅
-- Electoral circles ✅
-- Parliamentary groups ✅
-- Voting details with party breakdown ✅
-- Historical data (all legislatures)
-
-🔜 **Phase 4: Advanced Analytics**
-- CSV export for data journalists
-- Voting pattern analysis
-- Party distance metrics
-- Deputy voting records
-
----
-
 ## Data Source
 
 **Portuguese Parliament Open Data**
 https://www.parlamento.pt/Cidadania/Paginas/DadosAbertos.aspx
 
-All data is publicly available under Portugal's open data initiative. This API provides structured access to:
+All data is publicly available under the Assembleia da República open data initiative. This API provides structured access to:
+
 - Legislative initiatives (Iniciativas)
 - Voting sessions (Votações)
 - Deputy information (Deputados)
 - Parliamentary groups (Partidos)
 - Electoral circles (Círculos)
 
+The information used is, for now, the one on the "Iniciativas" and "Informação Base" pages.
 ---
 
 ## Related Projects
 
-**Hemicycle.party** - Advanced visualizations and analytics
-https://pt.hemicycle.party
+**[Portal](https://www.votoaberto.org)** - Advanced visualizations and analytics.
 
-A Streamlit application that consumes this API to provide:
-- Voting distance heatmaps
-- Party clustering analysis
+Online portal that consumes this API to provide:
+
+- Party distance and clustering analysis
+![](docs/portal_ss4.png)
+- MDS analysis
+![](docs/portal_ss1.png)
 - Deputy voting patterns
 - Interactive visualizations
+![](docs/portal_ss3.png)
+- User quizzes
+- Details about party iniciatives and votes
+![](docs/portal_ss2.png)
+- MP voting records
+- Geographical origin of MPs
 
+... and more
+
+**[ParlaTUI](https://codeberg.org/fsm/parlatui/)** - a TUI explorer for parliamentary data.
+
+TUI application that uses this API to provide an overview of parliamentary activty, covering some of the same ground as the portal. 
+
+![](docs/parlatui.gif)
 ---
 
 ## License

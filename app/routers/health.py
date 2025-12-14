@@ -1,5 +1,9 @@
 """
 Health check and metadata endpoints.
+
+Frederico Muñoz <fsmunoz@gmail.com>
+
+Health check with minimal additional metadata
 """
 
 from fastapi import APIRouter, Depends
@@ -42,6 +46,8 @@ def health_check(db: duckdb.DuckDBPyConnection = Depends(get_db)):
         stats["database_connection"] = "ok"
 
         # Configuration information (useful for debugging)
+        # FIXME: this could be too much actually.
+        
         stats["config"] = {
             "memory_limit": settings.DUCKDB_MEMORY_LIMIT,
             "threads": settings.DUCKDB_THREADS,
@@ -104,6 +110,8 @@ def health_check(db: duckdb.DuckDBPyConnection = Depends(get_db)):
             stats["legislatures"] = []
 
         # Determine overall health status
+        # FIXME: I need to revisit this since it might be the wrong approach and not really help
+        
         if errors:
             # Critical errors - core functionality affected
             status = "unhealthy"

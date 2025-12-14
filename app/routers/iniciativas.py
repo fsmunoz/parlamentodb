@@ -1,5 +1,9 @@
 """
 Iniciativas (legislative initiatives) endpoints.
+
+Frederico Muñoz <fsmunoz@gmail.com>
+
+Iniciativa related information
 """
 
 from datetime import date
@@ -24,6 +28,7 @@ def list_iniciativas(
     legislatura: str | None = Query(None, description="Filter by legislature (L15, L16, L17)"),
     ini_nr: str | None = Query(None, description="Filter by initiative number (not unique - may return multiple)"),
     tipo: str | None = Query(None, description="Filter by initiative type code"),
+    q: str | None = Query(None, description="Search in initiative title (ini_titulo). Case-insensitive substring match."),
     data_desde: date | None = Query(None, description="Filter by event date from (YYYY-MM-DD) - queries actual event dates"),
     data_ate: date | None = Query(None, description="Filter by event date until (YYYY-MM-DD) - queries actual event dates"),
     evento_fase: str | None = Query(None, description="Filter by event type(s). Comma-separated for multiple: 'Entrada,Admissão'"),
@@ -87,6 +92,8 @@ def list_iniciativas(
             )
         """, {"dep_cad_id": dep_cad_id})
 
+        qb.add_text_search("ini_titulo", q)
+
         base_where_clauses = qb.clauses
         params = qb.get_params()
 
@@ -136,6 +143,8 @@ def list_iniciativas(
                     SELECT
                         ini_id, ini_nr, legislatura, ini_tipo,
                         ini_desc_tipo, ini_titulo,
+                        list_transform(ini_autor_grupos_parlamentares, x -> x.GP) as autor_gp,
+                        ini_data,
                         UNNEST(ini_eventos) as evento
                     FROM iniciativas
                     {base_where}
@@ -143,15 +152,15 @@ def list_iniciativas(
                 matching_initiatives AS (
                     SELECT DISTINCT
                         ini_id, ini_nr, legislatura, ini_tipo,
-                        ini_desc_tipo, ini_titulo
+                        ini_desc_tipo, ini_titulo, autor_gp, ini_data
                     FROM event_filtered
                     WHERE {event_where}
                 )
                 SELECT
                     ini_id, ini_nr, legislatura, ini_tipo,
-                    ini_desc_tipo, ini_titulo
+                    ini_desc_tipo, ini_titulo, autor_gp
                 FROM matching_initiatives
-                ORDER BY ini_nr DESC
+                ORDER BY ini_data DESC NULLS LAST, ini_id DESC
                 LIMIT $limit OFFSET $offset
             """
         else:
@@ -168,10 +177,11 @@ def list_iniciativas(
                     legislatura,
                     ini_tipo,
                     ini_desc_tipo,
-                    ini_titulo
+                    ini_titulo,
+                    list_transform(ini_autor_grupos_parlamentares, x -> x.GP) as autor_gp
                 FROM iniciativas
                 {where_sql}
-                ORDER BY ini_nr DESC
+                ORDER BY ini_data DESC NULLS LAST, ini_id DESC
                 LIMIT $limit OFFSET $offset
             """
 
@@ -186,7 +196,8 @@ def list_iniciativas(
                 legislatura=row[2],
                 ini_tipo=row[3],
                 ini_desc_tipo=row[4],
-                ini_titulo=row[5]
+                ini_titulo=row[5],
+                autor_gp=row[6]
             )
             for row in rows
         ]

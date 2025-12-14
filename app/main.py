@@ -12,7 +12,7 @@ from fastapi.responses import RedirectResponse
 import structlog
 
 from app.config import settings
-from app.routers import health, iniciativas, votacoes, legislaturas, deputados, circulos, partidos
+from app.routers import health, iniciativas, votacoes, legislaturas, deputados, circulos, partidos, stats
 
 logger = structlog.get_logger()
 
@@ -39,6 +39,7 @@ app.include_router(legislaturas.router)
 app.include_router(deputados.router)
 app.include_router(circulos.router)
 app.include_router(partidos.router)
+app.include_router(stats.router)
 
 
 @app.on_event("startup")

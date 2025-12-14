@@ -1,5 +1,9 @@
 """
 Deputados (deputies/MPs) endpoints.
+
+Frederico Muñoz <fsmunoz@gmail.com>
+
+Information about MPs.
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -24,6 +28,7 @@ def list_deputados(
     partido: str | None = Query(None, description="Filter by party (PS, PSD, etc.)"),
     circulo: str | None = Query(None, description="Filter by electoral circle name"),
     situacao: str | None = Query(None, description="Filter by status (Efetivo, Suplente, Renunciou)"),
+    q: str | None = Query(None, description="Search in deputy name (nome_parlamentar). Case-insensitive substring match."),
     limit: int = Query(settings.DEFAULT_LIMIT, le=settings.MAX_LIMIT, ge=1),
     offset: int = Query(0, ge=0),
     db: duckdb.DuckDBPyConnection = Depends(get_db)
@@ -51,6 +56,7 @@ def list_deputados(
         qb.add_equals("partido_atual", partido, "partido")
         qb.add_equals("circulo_atual", circulo, "circulo")
         qb.add_equals("situacao_atual", situacao, "situacao")
+        qb.add_text_search("nome_parlamentar", q)
 
         where_sql = qb.build_where()
         params = qb.get_params()
@@ -113,7 +119,8 @@ def get_deputado(
     """
     Get a single deputy by cadastro ID.
 
-    The dep_cad_id is a persistent identifier that links deputies across legislatures.
+    The dep_cad_id is a persistent identifier that links deputies across legislatures, so
+    we use that. It is also used to get the photo since it's a part of the URL.
     """
     try:
         # Validate legislature
@@ -159,9 +166,9 @@ def get_deputado_iniciativas(
     db: duckdb.DuckDBPyConnection = Depends(get_db)
 ):
     """
-    List all initiatives authored by a specific deputy.
+    List all initiatives authored by a specific MP.
 
-    Returns initiatives where the deputy is listed as an individual author
+    Returns initiatives where the MP is listed as an individual author
     (ini_autor_deputados field). Initiatives authored only by parliamentary
     groups or government are excluded.
     """

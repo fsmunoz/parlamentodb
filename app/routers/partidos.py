@@ -11,9 +11,11 @@ from app.dependencies import get_db
 from app.models.partido import Partido, PartidoListItem
 from app.models.deputado import DeputadoListItem
 from app.models.iniciativa import IniciativaListItem
+from app.models.partidos import PartyVoteSupportResponse, PartyVoteSupportData, FaseVoteSupport, PartyVoteCount
 from app.models.common import APIResponse, PaginationMeta, APIMeta
 from app.models.validators import validate_legislatura, validate_pagination
 from app.queries.utils import QueryBuilder
+from app.queries.partidos import get_party_vote_support
 
 router = APIRouter(prefix="/api/v1/partidos", tags=["partidos"])
 logger = structlog.get_logger()
@@ -284,7 +286,7 @@ def get_partido_iniciativas(
                 $gp_sigla
             )
               AND legislatura = $legislatura
-            ORDER BY ini_nr DESC
+            ORDER BY ini_data DESC NULLS LAST, ini_id DESC
             LIMIT $limit OFFSET $offset
         """
 
@@ -321,4 +323,94 @@ def get_partido_iniciativas(
         raise HTTPException(
             status_code=500,
             detail="Internal server error while fetching party initiatives"
+        )
+
+
+@router.get("/{gp_sigla}/vote-support", response_model=PartyVoteSupportResponse)
+def get_partido_vote_support(
+    gp_sigla: str,
+    legislatura: str = Query(..., description="Legislature (required)"),
+    db: duckdb.DuckDBPyConnection = Depends(get_db)
+):
+    """
+    Get aggregated vote counts by parties on initiatives authored by a specific party.
+
+    Shows how other parties voted on initiatives from the focus party,
+    grouped by legislative phase (fase). This allows analysis of which parties
+    supported or opposed initiatives from each party.
+
+    Example: For PCP initiatives in L17, shows that CHEGA voted 1323 times
+    in favor, 332 against, and 355 abstentions across all "Votação Final Global" phases.
+
+    Returns aggregated summary data (sums), not individual voting records.
+    """
+    try:
+        # Validate inputs
+        legislatura = validate_legislatura(legislatura)
+
+        # Verify party exists
+        party_query = """
+            SELECT gp_nome FROM partidos
+            WHERE gp_sigla = $gp_sigla AND legislatura = $legislatura
+        """
+        party_result = db.execute(party_query, {"gp_sigla": gp_sigla.upper(), "legislatura": legislatura}).fetchone()
+
+        if not party_result:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Party {gp_sigla} not found in legislatura {legislatura}"
+            )
+
+        # Get vote support data
+        rows = get_party_vote_support(db, gp_sigla, legislatura)
+
+        # Transform query results into response structure
+        # Query returns: (fase, party, a_favor_count, contra_count, abstencao_count)
+        # Group by fase
+        fase_map: dict[str, list[PartyVoteCount]] = {}
+        for fase, party, a_favor, contra, abstencao in rows:
+            if fase not in fase_map:
+                fase_map[fase] = []
+            fase_map[fase].append(
+                PartyVoteCount(
+                    party=party,
+                    a_favor=a_favor,
+                    contra=contra,
+                    abstencao=abstencao
+                )
+            )
+
+        # Convert to list of FaseVoteSupport
+        vote_support_by_fase = [
+            FaseVoteSupport(fase=fase, vote_details=vote_details)
+            for fase, vote_details in fase_map.items()
+        ]
+
+        # Build response
+        data = PartyVoteSupportData(
+            party=gp_sigla.upper(),
+            legislatura=legislatura,
+            vote_support_by_fase=vote_support_by_fase
+        )
+
+        logger.info(
+            "partido_vote_support_success",
+            gp_sigla=gp_sigla,
+            legislatura=legislatura,
+            total_fases=len(vote_support_by_fase),
+            total_parties=sum(len(fase.vote_details) for fase in vote_support_by_fase)
+        )
+
+        return PartyVoteSupportResponse(
+            data=data,
+            meta=APIMeta(version=settings.API_VERSION)
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("partido_vote_support_error", gp_sigla=gp_sigla, legislatura=legislatura, error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error while fetching party vote support"
         )

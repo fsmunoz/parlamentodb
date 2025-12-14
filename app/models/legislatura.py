@@ -1,5 +1,10 @@
 """
 Pydantic models for Legislatura (legislature metadata) responses.
+
+Frederico Muñoz <fsmunoz@gmail.com>
+
+This includes the 'base information' about the legislature, which is obtained
+from a specific file (different from Iniciativas)
 """
 
 from datetime import date

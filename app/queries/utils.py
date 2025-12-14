@@ -48,6 +48,25 @@ class QueryBuilder:
             self.params[param_name] = value
         return self
 
+    def add_text_search(self, field: str, search_text: str, param_name: str | None = None):
+        """Add case-insensitive text search (ILIKE) for substring matching.
+
+        Args:
+            field: Field name to search in
+            search_text: Search term (will be wrapped with % wildcards)
+            param_name: Optional parameter name (defaults to field_search)
+
+        Returns:
+            self for method chaining
+        """
+        if search_text is not None and search_text.strip():
+            param_name = param_name or f"{field}_search"
+            # Wrap with wildcards for substring matching
+            search_pattern = f"%{search_text.strip()}%"
+            self.clauses.append(f"{field} ILIKE ${param_name}")
+            self.params[param_name] = search_pattern
+        return self
+
     def add_custom(self, clause: str, params: dict[str, Any] | None = None):
         """Add custom SQL clause with optional parameters."""
         self.clauses.append(clause)

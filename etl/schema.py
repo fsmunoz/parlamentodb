@@ -64,6 +64,11 @@ def get_select_clause(legislature: str) -> str:
     for old, new in FIELD_MAPPING.items():
         selects.append(f"{old} as {new}")
 
+    # Add derived field: ini_data (date of first event - initiative submission date)
+    # This is the minimum DataFase from ini_eventos array, representing when the
+    # initiative was first "known" to parliament (typically the "Entrada" event)
+    selects.append("""list_min(list_transform(IniEventos, x -> x.DataFase)) AS ini_data""")
+
     # Add metadata fields
     selects.append(f"'{legislature}' as legislatura")
     selects.append("CURRENT_TIMESTAMP as etl_timestamp")

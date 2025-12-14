@@ -21,6 +21,10 @@ class IniciativaListItem(BaseModel):
     ini_tipo: str | None = Field(None, description="Initiative type")
     ini_desc_tipo: str | None = Field(None, description="Initiative type description")
     ini_titulo: str | None = Field(None, description="Initiative title")
+    autor_gp: list[str] | None = Field(
+        None,
+        description="Parliamentary group authors (e.g., ['PS'], ['PCP', 'BE'])"
+    )
     # REMOVED: data_inicio_leg - misleading field (was legislature start, not event date)
     # Use data_desde/data_ate filters to query actual event dates
     # Full date available in detail view: GET /iniciativas/{ini_id}
