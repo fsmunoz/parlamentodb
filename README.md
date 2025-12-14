@@ -360,5 +360,7 @@ TUI application that uses this API to provide an overview of parliamentary activ
 
 ## License
 
+![](docs/agplv3-155x51.png)
+
 GNU Affero General Public License v3.0.
 
