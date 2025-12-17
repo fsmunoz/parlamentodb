@@ -146,6 +146,7 @@ def health_check(db: duckdb.DuckDBPyConnection = Depends(get_db)):
         )
 
 
+# TODO: remove hardcoded coverage    
 @router.get("/api/v1/meta", response_model=APIMeta)
 def api_metadata():
     """
@@ -155,5 +156,5 @@ def api_metadata():
     """
     return APIMeta(
         version=settings.API_VERSION,
-        legislature_coverage=["L15", "L16", "L17"]
+        legislature_coverage=["L13","L14","L15", "L16", "L17"]
     )
