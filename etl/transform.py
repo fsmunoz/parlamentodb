@@ -12,7 +12,7 @@ import structlog
 from pathlib import Path
 
 import config
-from etl.schema import get_select_clause
+from etl.schema import get_select_clause, get_atividades_select_clause
 
 logger = structlog.get_logger()
 
@@ -690,13 +690,262 @@ def transform_partidos(legislature: str, silver_path: Path | None = None) -> Pat
         raise TransformError(f"Error transforming partidos for {legislature}: {e}")
 
 
+def transform_atividades(
+    legislature: str,
+    bronze_path: Path | None = None,
+    silver_path: Path | None = None
+) -> Path | None:
+    """
+    Transform Atividades JSON to Parquet.
+
+    Extracts the Atividades array from nested {"AtividadesGerais": {"Atividades": [...]}}
+    structure and applies field name normalization.
+
+    Args:
+        legislature: Legislature ID (e.g., "L17")
+        bronze_path: Input JSON path (default: auto-detect)
+        silver_path: Output Parquet path (default: auto-detect)
+
+    Returns:
+        Path to created Parquet file, or None if bronze file doesn't exist
+
+    Raises:
+        TransformError: If transformation fails
+    """
+    if bronze_path is None:
+        bronze_path = config.BRONZE_DIR / f"atividades_{legislature.lower()}.json"
+
+    if silver_path is None:
+        silver_path = config.SILVER_DIR / f"atividades_{legislature.lower()}.parquet"
+
+    if not bronze_path.exists():
+        logger.warning("bronze_file_not_found", path=str(bronze_path))
+        return None
+
+    logger.info("transforming_atividades", legislature=legislature, input=str(bronze_path))
+
+    try:
+        conn = duckdb.connect()
+
+        # Configure DuckDB
+        conn.execute(f"SET memory_limit='{config.DUCKDB_MEMORY_LIMIT}'")
+        conn.execute(f"SET threads={config.DUCKDB_THREADS}")
+
+        # Get SELECT clause with field mappings
+        select_clause = get_atividades_select_clause(legislature)
+
+        # Transform: JSON -> Parquet
+        # Extract Atividades array from nested structure
+        query = f"""
+            COPY (
+                WITH atividades_gerais AS (
+                    SELECT AtividadesGerais FROM read_json_auto(
+                        '{bronze_path}',
+                        maximum_object_size=16777216
+                    )
+                ),
+                atividades_array AS (
+                    SELECT UNNEST(AtividadesGerais.Atividades) as ativ
+                    FROM atividades_gerais
+                    WHERE AtividadesGerais.Atividades IS NOT NULL
+                )
+                SELECT
+                    -- Generate synthetic ID (composite key or hash)
+                    CASE
+                        WHEN ativ.Numero IS NOT NULL
+                        THEN '{legislature}_' || ativ.Tipo || '_' || ativ.Numero
+                        ELSE '{legislature}_' || MD5(COALESCE(ativ.Assunto, '') || COALESCE(CAST(ativ.DataEntrada AS VARCHAR), ''))
+                    END as ativ_id,
+                    ativ.Assunto as ativ_assunto,
+                    ativ.Tipo as ativ_tipo,
+                    ativ.DescTipo as ativ_desc_tipo,
+                    ativ.Numero as ativ_numero,
+                    ativ.Sessao as sessao,
+                    ativ.DataEntrada as data_entrada,
+                    ativ.DataAgendamentoDebate as data_agendamento_debate,
+                    ativ.DataAnuncio as data_anuncio,
+                    ativ.AutoresGP as ativ_autores_gp,
+                    ativ.TipoAutor as ativ_tipo_autor,
+                    ativ.Publicacao as publicacao,
+                    ativ.PublicacaoDebate as publicacao_debate,
+                    ativ.VotacaoDebate as votacao_debate,
+                    ativ.Observacoes as observacoes,
+                    '{legislature}' as legislatura,
+                    CURRENT_TIMESTAMP as etl_timestamp
+                FROM atividades_array
+                ORDER BY data_entrada DESC NULLS LAST
+            ) TO '{silver_path}' (
+                FORMAT PARQUET,
+                COMPRESSION '{config.PARQUET_COMPRESSION}',
+                ROW_GROUP_SIZE {config.PARQUET_ROW_GROUP_SIZE}
+            )
+        """
+
+        conn.execute(query)
+
+        # Get stats
+        record_count = conn.execute(f"""
+            SELECT count(*) FROM '{silver_path}'
+        """).fetchone()[0]
+
+        size_mb = round(silver_path.stat().st_size / 1024.0 / 1024.0, 2)
+
+        logger.info(
+            "transform_atividades_complete",
+            legislature=legislature,
+            atividades=record_count,
+            size_mb=size_mb,
+            compression_ratio=round(
+                bronze_path.stat().st_size / silver_path.stat().st_size, 2
+            )
+        )
+
+        return silver_path
+
+    except duckdb.Error as e:
+        logger.error("duckdb_error", legislature=legislature, error=str(e))
+        raise TransformError(f"DuckDB error: {e}")
+    except Exception as e:
+        logger.error("transform_error", legislature=legislature, error=str(e))
+        raise TransformError(f"Error transforming atividades for {legislature}: {e}")
+
+
+def transform_atividades_votacoes(
+    legislature: str,
+    silver_path: Path | None = None
+) -> Path | None:
+    """
+    Extract votes from atividades.votacao_debate array.
+
+    Flattens nested VotacaoDebate array and parses HTML voting details
+    using the same parse_detalhe() UDF as iniciativas votes.
+
+    Args:
+        legislature: Legislature ID (e.g., "L17")
+        silver_path: Output Parquet path (default: auto-detect)
+
+    Returns:
+        Path to created votacoes Parquet file, or None if atividades not found
+
+    Raises:
+        TransformError: If transformation fails
+    """
+    if silver_path is None:
+        silver_path = config.SILVER_DIR / f"atividades_votacoes_{legislature.lower()}.parquet"
+
+    # Source: already-transformed atividades parquet
+    atividades_path = config.SILVER_DIR / f"atividades_{legislature.lower()}.parquet"
+
+    if not atividades_path.exists():
+        logger.warning("atividades_file_not_found", path=str(atividades_path))
+        return None
+
+    logger.info("transforming_atividades_votacoes", legislature=legislature)
+
+    try:
+        conn = duckdb.connect()
+
+        # Configure DuckDB
+        conn.execute(f"SET memory_limit='{config.DUCKDB_MEMORY_LIMIT}'")
+        conn.execute(f"SET threads={config.DUCKDB_THREADS}")
+
+        # Register parse_detalhe UDF (reuse from votacoes)
+        conn.create_function(
+            "parse_detalhe",
+            parse_detalhe,
+            parameters=[duckdb.string_type()],
+            return_type=duckdb.struct_type({
+                'a_favor': duckdb.list_type(duckdb.string_type()),
+                'contra': duckdb.list_type(duckdb.string_type()),
+                'abstencao': duckdb.list_type(duckdb.string_type()),
+                'ausencia': duckdb.list_type(duckdb.string_type())
+            })
+        )
+
+        # Flatten votes from atividades
+        query = f"""
+            COPY (
+                WITH atividades_with_votes AS (
+                    SELECT
+                        ativ_id,
+                        ativ_assunto,
+                        ativ_tipo,
+                        ativ_numero,
+                        legislatura,
+                        data_entrada,
+                        ativ_autores_gp,
+                        UNNEST(votacao_debate) as vot
+                    FROM '{atividades_path}'
+                    WHERE votacao_debate IS NOT NULL
+                      AND length(votacao_debate) > 0
+                )
+                SELECT
+                    vot.id as vot_id,
+                    ativ_id,
+                    legislatura,
+                    ativ_assunto as assunto,
+                    ativ_tipo as tipo,
+                    ativ_numero as numero,
+                    data_entrada,
+                    ativ_autores_gp as autores_gp,
+                    vot.data as data,
+                    vot.resultado,
+                    vot.descricao,
+                    vot.reuniao,
+                    vot.unanime,
+                    vot.ausencias,
+                    vot.detalhe,
+                    parse_detalhe(vot.detalhe) as detalhe_parsed,
+                    CASE
+                        WHEN vot.detalhe IS NOT NULL AND length(vot.detalhe) > 0
+                        THEN true
+                        ELSE false
+                    END as has_party_details,
+                    'atividade' as source
+                FROM atividades_with_votes
+                ORDER BY data DESC NULLS LAST, vot_id
+            ) TO '{silver_path}' (
+                FORMAT PARQUET,
+                COMPRESSION '{config.PARQUET_COMPRESSION}',
+                ROW_GROUP_SIZE {config.PARQUET_ROW_GROUP_SIZE}
+            )
+        """
+
+        conn.execute(query)
+
+        # Get stats
+        record_count = conn.execute(f"""
+            SELECT count(*) FROM '{silver_path}'
+        """).fetchone()[0]
+
+        size_mb = round(silver_path.stat().st_size / 1024.0 / 1024.0, 2)
+
+        logger.info(
+            "transform_atividades_votacoes_complete",
+            legislature=legislature,
+            votes=record_count,
+            size_mb=size_mb
+        )
+
+        return silver_path
+
+    except duckdb.Error as e:
+        logger.error("duckdb_error", legislature=legislature, error=str(e))
+        raise TransformError(f"DuckDB error: {e}")
+    except Exception as e:
+        logger.error("transform_error", legislature=legislature, error=str(e))
+        raise TransformError(f"Error transforming atividades_votacoes for {legislature}: {e}")
+
+
 def transform_all(
     legislatures: list[str] | None = None,
     include_info_base: bool = True,
     include_votacoes: bool = True,
     include_deputados: bool = False,
     include_circulos: bool = False,
-    include_partidos: bool = False
+    include_partidos: bool = False,
+    include_atividades: bool = True,
+    include_atividades_votacoes: bool = True
 ) -> dict[str, dict[str, Path]]:
     """
     Transform multiple legislatures and their metadata.
@@ -708,6 +957,8 @@ def transform_all(
         include_deputados: Also create flattened deputados file
         include_circulos: Also create flattened circulos file
         include_partidos: Also create flattened partidos file
+        include_atividades: Also transform Atividades data
+        include_atividades_votacoes: Also create flattened atividades_votacoes file
 
     Returns:
         Dict mapping legislature ID to {
@@ -716,7 +967,9 @@ def transform_all(
             "votacoes": Path | None,
             "deputados": Path | None,
             "circulos": Path | None,
-            "partidos": Path | None
+            "partidos": Path | None,
+            "atividades": Path | None,
+            "atividades_votacoes": Path | None
         }
     """
     if legislatures is None:
@@ -769,6 +1022,24 @@ def transform_all(
             except TransformError as e:
                 logger.error("transform_partidos_failed", legislature=leg, error=str(e))
 
+        # Transform atividades
+        if include_atividades:
+            try:
+                atividades_path = transform_atividades(leg)
+                if atividades_path:
+                    leg_results["atividades"] = atividades_path
+            except TransformError as e:
+                logger.error("transform_atividades_failed", legislature=leg, error=str(e))
+
+        # Transform atividades_votacoes (requires atividades to exist)
+        if include_atividades_votacoes and "atividades" in leg_results:
+            try:
+                atividades_votacoes_path = transform_atividades_votacoes(leg)
+                if atividades_votacoes_path:
+                    leg_results["atividades_votacoes"] = atividades_votacoes_path
+            except TransformError as e:
+                logger.error("transform_atividades_votacoes_failed", legislature=leg, error=str(e))
+
         if leg_results:
             results[leg] = leg_results
 
@@ -783,7 +1054,9 @@ if __name__ == "__main__":
         include_votacoes=True,
         include_deputados=True,
         include_circulos=True,
-        include_partidos=True
+        include_partidos=True,
+        include_atividades=True,
+        include_atividades_votacoes=True
     )
     print(f"==> Transform completed. Results: {len(results)} legislatures processed")
     for leg, paths in results.items():

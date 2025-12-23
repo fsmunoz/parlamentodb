@@ -197,9 +197,104 @@ def fetch_info_base(legislature: str, force: bool = False) -> Path | None:
             temp_path.unlink()
 
 
+@retry(
+    stop=stop_after_attempt(config.FETCH_RETRIES),
+    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY)
+)
+def fetch_atividades(legislature: str, force: bool = False) -> Path | None:
+    """
+    Fetch Atividades JSON data for a legislature.
+
+    Downloads parliamentary activities (condemnation votes, motions, etc.)
+    and saves to "bronze" directory. Structure: {"AtividadesGerais": {"Atividades": [...]}}.
+
+    The structure of these votes is different from the one in Iniciativas (and doesn't have a unique ID).
+    Args:
+        legislature: Legislature ID (e.g., "L17")
+        force: Re-download even if file exists
+
+    Returns:
+        Path to downloaded JSON file, or None if URL not configured
+
+    Raises:
+        FetchError: If download fails after retries
+        ValueError: If legislature is not configured
+    """
+    if legislature not in config.LEGISLATURES:
+        raise ValueError(f"Unknown legislature: {legislature}")
+
+    leg_config = config.LEGISLATURES[legislature]
+    atividades_url = leg_config.get("atividades_url", "")
+
+    # Skip if URL not configured
+    if not atividades_url:
+        logger.warning("atividades_url_not_configured", legislature=legislature)
+        return None
+
+    output_path = config.BRONZE_DIR / f"atividades_{legislature.lower()}.json"
+
+    # Skip if exists and not forcing
+    if output_path.exists() and not force:
+        logger.info("file_exists", path=str(output_path), legislature=legislature)
+        return output_path
+
+    logger.info("fetching_atividades", legislature=legislature, url=atividades_url)
+
+    # Download to temp file first (atomic write)
+    temp_path = output_path.with_suffix(".json.tmp")
+
+    try:
+        with httpx.Client(timeout=config.FETCH_TIMEOUT) as client:
+            response = client.get(
+                atividades_url,
+                headers={"User-Agent": config.USER_AGENT},
+                follow_redirects=True
+            )
+            response.raise_for_status()
+
+            # Verify JSON structure
+            data = response.json()
+            if not isinstance(data, dict):
+                raise FetchError(f"Expected dict, got {type(data)}")
+
+            # Validate expected structure
+            if "AtividadesGerais" not in data:
+                logger.warning("missing_atividades_gerais", legislature=legislature)
+            elif "Atividades" not in data.get("AtividadesGerais", {}):
+                logger.warning("missing_atividades_array", legislature=legislature)
+
+            # Write to temp file
+            temp_path.write_text(response.text, encoding="utf-8")
+
+            # Atomic rename
+            temp_path.rename(output_path)
+
+            atividades_count = len(data.get("AtividadesGerais", {}).get("Atividades", []))
+            logger.info(
+                "fetch_atividades_complete",
+                legislature=legislature,
+                atividades=atividades_count,
+                size_mb=round(output_path.stat().st_size / 1_000_000, 2)
+            )
+
+            return output_path
+
+    except httpx.HTTPError as e:
+        logger.error("http_error", legislature=legislature, error=str(e))
+        raise FetchError(f"HTTP error: {e}")
+    except Exception as e:
+        logger.error("fetch_error", legislature=legislature, error=str(e))
+        raise FetchError(f"Error fetching atividades for {legislature}: {e}")
+    finally:
+        # Clean up temp file if it exists
+        if temp_path.exists():
+            temp_path.unlink()
+
+
 def fetch_all(
     legislatures: list[str] | None = None,
     include_info_base: bool = True,
+    include_atividades: bool = True,
     force: bool = False
 ) -> dict[str, dict[str, Path]]:
     """
@@ -208,12 +303,14 @@ def fetch_all(
     Args:
         legislatures: List of legislature IDs, or None for all configured
         include_info_base: Also fetch InformacaoBase metadata
+        include_atividades: Also fetch Atividades data
         force: Re-download files even if they exist
 
     Returns:
         Dict mapping legislature ID to {
             "iniciativas": Path,
-            "info_base": Path | None
+            "info_base": Path | None,
+            "atividades": Path | None
         }
     """
     if legislatures is None:
@@ -235,6 +332,13 @@ def fetch_all(
                 leg_results["info_base"] = fetch_info_base(leg, force=force)
             except FetchError as e:
                 logger.error("fetch_info_base_failed", legislature=leg, error=str(e))
+
+        # Fetch atividades
+        if include_atividades:
+            try:
+                leg_results["atividades"] = fetch_atividades(leg, force=force)
+            except FetchError as e:
+                logger.error("fetch_atividades_failed", legislature=leg, error=str(e))
 
         if leg_results:
             results[leg] = leg_results

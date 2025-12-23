@@ -45,6 +45,34 @@ FIELD_MAPPING = {
     "PropostasAlteracao": "propostas_alteracao",
 }
 
+# Atividades field name mapping (PascalCase -> snake_case with ativ_ prefix)
+ATIVIDADES_FIELD_MAPPING = {
+    # Core activity fields (prefixed with ativ_ to distinguish from iniciativas)
+    "Assunto": "ativ_assunto",
+    "Tipo": "ativ_tipo",
+    "DescTipo": "ativ_desc_tipo",
+    "Numero": "ativ_numero",
+    "Sessao": "sessao",
+
+    # Dates
+    "DataEntrada": "data_entrada",
+    "DataAgendamentoDebate": "data_agendamento_debate",
+    "DataAnuncio": "data_anuncio",
+
+    # Authors
+    "AutoresGP": "ativ_autores_gp",
+    "TipoAutor": "ativ_tipo_autor",
+
+    # Nested structures
+    "Publicacao": "publicacao",
+    "PublicacaoDebate": "publicacao_debate",
+    "VotacaoDebate": "votacao_debate",
+    "Observacoes": "observacoes",
+
+    # Legislature (common field, no prefix)
+    "Legislatura": "legislatura",
+}
+
 
 ## Helpers
 
@@ -68,6 +96,29 @@ def get_select_clause(legislature: str) -> str:
     # This is the minimum DataFase from ini_eventos array, representing when the
     # initiative was first "known" to parliament (typically the "Entrada" event)
     selects.append("""list_min(list_transform(IniEventos, x -> x.DataFase)) AS ini_data""")
+
+    # Add metadata fields
+    selects.append(f"'{legislature}' as legislatura")
+    selects.append("CURRENT_TIMESTAMP as etl_timestamp")
+
+    return ",\n            ".join(selects)
+
+
+def get_atividades_select_clause(legislature: str) -> str:
+    """
+    Generate SELECT clause for Atividades DuckDB transformation.
+
+    Args:
+        legislature: Legislature ID (e.g., "L17")
+
+    Returns:
+        SQL SELECT clause with field mappings and metadata
+    """
+    selects = []
+
+    # Add field mappings
+    for old, new in ATIVIDADES_FIELD_MAPPING.items():
+        selects.append(f"{old} as {new}")
 
     # Add metadata fields
     selects.append(f"'{legislature}' as legislatura")
