@@ -53,7 +53,7 @@ def test_list_iniciativas_with_filters():
 
 def test_list_votacoes():
     """Test list votacoes endpoint."""
-    response = client.get("/api/v1/votacoes/?limit=10")
+    response = client.get("/api/v1/iniciativas/votacoes/?limit=10")
     assert response.status_code == 200
     data = response.json()
     assert "data" in data
@@ -62,7 +62,7 @@ def test_list_votacoes():
 
 def test_date_filtering():
     """Test date filtering on votacoes."""
-    response = client.get("/api/v1/votacoes/?data_desde=2025-01-01&limit=100")
+    response = client.get("/api/v1/iniciativas/votacoes/?data_desde=2025-01-01&limit=100")
     assert response.status_code == 200
     data = response.json()
     # All returned votes should be >= 2025-01-01
@@ -161,17 +161,41 @@ def test_root_redirects_to_docs():
     assert "/docs" in response.headers["location"]
 
 
+def test_votacoes_redirect_list():
+    """Test old /votacoes endpoint redirects to /iniciativas/votacoes."""
+    response = client.get("/api/v1/votacoes/?limit=5", follow_redirects=False)
+    assert response.status_code == 301  # Permanent redirect
+    assert "/api/v1/iniciativas/votacoes/" in response.headers["location"]
+    assert "limit=5" in response.headers["location"]
+
+
+def test_votacoes_redirect_detail():
+    """Test old /votacoes/{id} endpoint redirects to /iniciativas/votacoes/{id}."""
+    response = client.get("/api/v1/votacoes/test_id", follow_redirects=False)
+    assert response.status_code == 301  # Permanent redirect
+    assert "/api/v1/iniciativas/votacoes/test_id" in response.headers["location"]
+
+
+def test_votacoes_redirect_with_query_params():
+    """Test redirect preserves query parameters."""
+    response = client.get("/api/v1/votacoes/?legislatura=L17&partido_favor=PS", follow_redirects=False)
+    assert response.status_code == 301
+    assert "/api/v1/iniciativas/votacoes/" in response.headers["location"]
+    assert "legislatura=L17" in response.headers["location"]
+    assert "partido_favor=PS" in response.headers["location"]
+
+
 def test_detalhe_parsed():
     """Test detalhe is parsed into structured format."""
     # Get a votacao with detalhe
-    response = client.get("/api/v1/votacoes/?limit=100")
+    response = client.get("/api/v1/iniciativas/votacoes/?limit=100")
     assert response.status_code == 200
     data = response.json()
 
     # Find a vote with vot_id to check details
     if data["data"]:
         vot_id = data["data"][0]["vot_id"]
-        detail_response = client.get(f"/api/v1/votacoes/{vot_id}")
+        detail_response = client.get(f"/api/v1/iniciativas/votacoes/{vot_id}")
         assert detail_response.status_code == 200
         vote_data = detail_response.json()
 
@@ -191,7 +215,7 @@ def test_detalhe_parsed():
 def test_party_filter():
     """Test filtering by party position."""
     # Test filtering by party voting in favor
-    response = client.get("/api/v1/votacoes/?partido_favor=PSD&limit=10")
+    response = client.get("/api/v1/iniciativas/votacoes/?partido_favor=PSD&limit=10")
     assert response.status_code == 200
     # Note: This test validates the API accepts the parameter
     # Actual filtering validation would require checking detalhe_parsed in responses
@@ -200,7 +224,7 @@ def test_party_filter():
 def test_ninsc_preserved():
     """Test that Ninsc members are preserved with full names."""
     # Get votes, looking for nominal votes that might have Ninsc members
-    response = client.get("/api/v1/votacoes/?limit=100")
+    response = client.get("/api/v1/iniciativas/votacoes/?limit=100")
     assert response.status_code == 200
 
     # This test validates that the API handles Ninsc members correctly
@@ -445,3 +469,222 @@ def test_get_partido_deputados_l16():
     # All deputies should be from PS
     for dep in data["data"]:
         assert dep["partido_atual"] == "PS"
+
+
+# =============================================================================
+# Tests for Atividades
+# =============================================================================
+
+
+def test_list_atividades_returns_200():
+    """Test list atividades endpoint."""
+    response = client.get("/api/v1/atividades/?limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "pagination" in data
+    assert "meta" in data
+    assert len(data["data"]) <= 10
+
+
+def test_list_atividades_with_filters():
+    """Test atividades with filters."""
+    response = client.get("/api/v1/atividades/?legislatura=L17&limit=5")
+    assert response.status_code == 200
+    data = response.json()
+    # All results should be from L17
+    for item in data["data"]:
+        assert item["legislatura"] == "L17"
+
+
+def test_get_atividade_by_id():
+    """Test getting a single activity by ID."""
+    # First, get an activity ID from the list
+    list_response = client.get("/api/v1/atividades/?limit=1")
+    assert list_response.status_code == 200
+    data = list_response.json()["data"]
+    assert len(data) > 0
+
+    ativ_id = data[0]["ativ_id"]
+
+    # Get the full activity
+    response = client.get(f"/api/v1/atividades/{ativ_id}")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["ativ_id"] == ativ_id
+    assert "ativ_tipo" in result
+    assert "ativ_assunto" in result
+
+
+def test_get_nonexistent_atividade():
+    """Test 404 for non-existent activity."""
+    response = client.get("/api/v1/atividades/nonexistent_id")
+    assert response.status_code == 404
+
+
+def test_atividades_filter_by_tipo():
+    """Test filtering activities by type."""
+    response = client.get("/api/v1/atividades/?tipo=VOT&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    # All results should be type VOT
+    for item in data["data"]:
+        assert item["ativ_tipo"] == "VOT"
+
+
+def test_atividades_filter_by_autor_gp():
+    """Test filtering activities by party author."""
+    response = client.get("/api/v1/atividades/?autor_gp=PS&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    # Note: Can't verify all have PS without checking array contents
+    # Just verify endpoint accepts the parameter
+
+
+def test_atividades_has_votes_field():
+    """Test that atividades include has_votes field."""
+    response = client.get("/api/v1/atividades/?limit=10")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    if data:
+        assert "has_votes" in data[0]
+        assert isinstance(data[0]["has_votes"], bool)
+
+
+def test_list_atividades_votacoes_returns_200():
+    """Test list atividades votes endpoint."""
+    response = client.get("/api/v1/atividades/votacoes/?limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "pagination" in data
+    assert len(data["data"]) <= 10
+
+
+def test_atividades_votacoes_filter_has_party_details():
+    """Test filtering activity votes by has_party_details flag (CRITICAL)."""
+    # Test filtering for votes WITH party details
+    response = client.get("/api/v1/atividades/votacoes/?has_party_details=true&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    # All returned votes should have party details
+    for vote in data["data"]:
+        assert vote["has_party_details"] is True
+
+    # Test filtering for votes WITHOUT party details
+    response = client.get("/api/v1/atividades/votacoes/?has_party_details=false&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    # All returned votes should NOT have party details
+    for vote in data["data"]:
+        assert vote["has_party_details"] is False
+
+
+def test_atividades_votacoes_partido_favor_filter():
+    """Test filtering activity votes by party voting in favor."""
+    response = client.get("/api/v1/atividades/votacoes/?partido_favor=PS&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    # Note: This validates the API accepts the parameter
+    # Actual filtering validation would require checking detalhe_parsed
+
+
+def test_atividades_votacoes_filter_by_legislatura():
+    """Test filtering activity votes by legislature."""
+    response = client.get("/api/v1/atividades/votacoes/?legislatura=L17&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    # All results should be from L17
+    for vote in data["data"]:
+        assert vote["legislatura"] == "L17"
+
+
+def test_atividades_votacoes_filter_by_resultado():
+    """Test filtering activity votes by result."""
+    response = client.get("/api/v1/atividades/votacoes/?resultado=Aprovado&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    # All results should be Aprovado
+    for vote in data["data"]:
+        if vote["resultado"]:  # Some might not have resultado
+            assert vote["resultado"] == "Aprovado"
+
+
+def test_get_atividade_votacao_by_id():
+    """Test getting a single activity vote by ID."""
+    # First, get a vote ID from the list
+    list_response = client.get("/api/v1/atividades/votacoes/?limit=1")
+    assert list_response.status_code == 200
+    data = list_response.json()["data"]
+
+    if len(data) > 0:
+        vot_id = data[0]["vot_id"]
+
+        # Get the full vote
+        response = client.get(f"/api/v1/atividades/votacoes/{vot_id}")
+        assert response.status_code == 200
+        result = response.json()
+        assert result["vot_id"] == vot_id
+        assert "has_party_details" in result
+        assert "source" in result
+        assert result["source"] == "atividade"
+        # Check for parsed structure
+        assert "detalhe_parsed" in result
+
+
+def test_get_nonexistent_atividade_votacao():
+    """Test 404 for non-existent activity vote."""
+    response = client.get("/api/v1/atividades/votacoes/nonexistent_vote_id")
+    assert response.status_code == 404
+
+
+def test_atividades_votacoes_detalhe_parsed_structure():
+    """Test that votes with party details have correct detalhe_parsed structure."""
+    # Get votes with party details
+    response = client.get("/api/v1/atividades/votacoes/?has_party_details=true&limit=5")
+    assert response.status_code == 200
+    data = response.json()["data"]
+
+    if data:
+        # Get full detail for first vote
+        vot_id = data[0]["vot_id"]
+        detail_response = client.get(f"/api/v1/atividades/votacoes/{vot_id}")
+        vote_data = detail_response.json()
+
+        # If has_party_details is true, detalhe_parsed should exist
+        if vote_data["has_party_details"]:
+            assert vote_data["detalhe_parsed"] is not None
+            assert "a_favor" in vote_data["detalhe_parsed"]
+            assert "contra" in vote_data["detalhe_parsed"]
+            assert "abstencao" in vote_data["detalhe_parsed"]
+            assert "ausencia" in vote_data["detalhe_parsed"]
+
+
+def test_stats_includes_atividades():
+    """Test that stats endpoint includes atividades aggregations."""
+    response = client.get("/api/v1/stats/?legislatura=L17")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "data" in data
+    stats = data["data"]
+
+    # Check for new atividades fields
+    assert "atividades_by_tipo" in stats
+    assert "atividades_votes_by_tipo" in stats
+    assert "vote_source_breakdown" in stats
+
+    # Verify structure
+    assert isinstance(stats["atividades_by_tipo"], list)
+    assert isinstance(stats["atividades_votes_by_tipo"], list)
+
+    # If atividades exist, verify vote_source_breakdown
+    if stats["vote_source_breakdown"]:
+        breakdown = stats["vote_source_breakdown"]
+        assert "iniciativas" in breakdown
+        assert "atividades" in breakdown
+        assert "total" in breakdown
+        # Total should equal sum
+        assert breakdown["total"] == breakdown["iniciativas"] + breakdown["atividades"]

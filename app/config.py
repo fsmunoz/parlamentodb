@@ -41,12 +41,12 @@ português quando apropriado, sem tradução completa da interface.
 Provides structured access to:
     
 - **Iniciativas**: Legislative initiatives (bills, resolutions, etc.)
-- **Votações**: Voting records with results
+- **Atividades**: Legislative activities (condemnation votes, etc.)    
+- **Votações**: Voting records with results, for both initiatives and activities
 - **Legislaturas**: Legislature metadata (number of deputies, parliamentary groups)
 - **Deputados**: information on MPs (personal information, status, circle)
 - **Círculos**: electoral circles (general information, MPs elected by circle)    
 
-Data currently covers legislatures XV, XVI, and XVII (~2019 - present), but work is being done in expanding the coverage.
 """
 
     # Pagination

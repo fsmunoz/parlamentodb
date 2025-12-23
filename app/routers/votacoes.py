@@ -18,7 +18,7 @@ from app.models.common import APIResponse, PaginationMeta, APIMeta
 from app.models.validators import validate_legislatura, validate_partido, validate_pagination
 from app.queries.utils import QueryBuilder
 
-router = APIRouter(prefix="/api/v1/votacoes", tags=["votacoes"])
+router = APIRouter(prefix="/api/v1/iniciativas/votacoes", tags=["votacoes"])
 logger = structlog.get_logger()
 
 

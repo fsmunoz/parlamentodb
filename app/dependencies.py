@@ -79,6 +79,22 @@ def get_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
                 SELECT * FROM read_parquet('{data_dir}/partidos_*.parquet')
             """)
 
+        # atividades and atividades_votacoes
+        # Note: Use specific patterns to avoid schema mismatch between atividades and atividades_votacoes
+        atividades_files = list(data_dir.glob("atividades_l*.parquet"))
+        if atividades_files:
+            conn.execute(f"""
+                CREATE VIEW atividades AS
+                SELECT * FROM read_parquet('{data_dir}/atividades_l*.parquet')
+            """)
+
+        atividades_votacoes_files = list(data_dir.glob("atividades_votacoes_*.parquet"))
+        if atividades_votacoes_files:
+            conn.execute(f"""
+                CREATE VIEW atividades_votacoes AS
+                SELECT * FROM read_parquet('{data_dir}/atividades_votacoes_*.parquet')
+            """)
+
         yield conn
 
     finally:

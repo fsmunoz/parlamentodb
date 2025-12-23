@@ -20,7 +20,7 @@ def test_ninsc_members_have_full_names():
     This ensures individual MPs who are not affiliated with a party are identifiable.
     """
     # Get a sample of votes
-    response = client.get("/api/v1/votacoes/?limit=100")
+    response = client.get("/api/v1/iniciativas/votacoes/?limit=100")
     assert response.status_code == 200
 
     votes = response.json()["data"]
@@ -28,7 +28,7 @@ def test_ninsc_members_have_full_names():
 
     # Check detailed vote information for Ninsc members
     for vote in votes[:10]:  # Check first 10 votes for performance
-        detail_response = client.get(f"/api/v1/votacoes/{vote['vot_id']}")
+        detail_response = client.get(f"/api/v1/iniciativas/votacoes/{vote['vot_id']}")
         if detail_response.status_code != 200:
             continue
 
@@ -111,14 +111,14 @@ def test_detalhe_parsed_structure():
     - ausencia (list of absent members)
     """
     # Get a vote with details
-    response = client.get("/api/v1/votacoes/?limit=50")
+    response = client.get("/api/v1/iniciativas/votacoes/?limit=50")
     assert response.status_code == 200
 
     votes = response.json()["data"]
     found_detailed_vote = False
 
     for vote in votes:
-        detail_response = client.get(f"/api/v1/votacoes/{vote['vot_id']}")
+        detail_response = client.get(f"/api/v1/iniciativas/votacoes/{vote['vot_id']}")
         if detail_response.status_code != 200:
             continue
 
@@ -153,7 +153,7 @@ def test_date_filtering_respected():
     Results should only include records within the specified date range.
     """
     # Test data_desde filter
-    response = client.get("/api/v1/votacoes/?data_desde=2025-01-01&limit=50")
+    response = client.get("/api/v1/iniciativas/votacoes/?data_desde=2025-01-01&limit=50")
     assert response.status_code == 200
 
     votes = response.json()["data"]
@@ -298,3 +298,237 @@ def test_ini_id_is_unique_identifier():
     # Should match the original
     assert result["ini_id"] == ini_id
     assert result["ini_nr"] == ini_nr
+
+
+# =============================================================================
+# Regression Tests for Atividades
+# =============================================================================
+
+
+def test_atividades_l17_count_307():
+    """
+    REGRESSION: L17 should have exactly 307 atividades.
+
+    This is a known constant from the atividades dataset transformation.
+    Validates ETL data integrity.
+    """
+    response = client.get("/api/v1/atividades/?legislatura=L17&limit=500")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["pagination"]["total"] == 307, \
+        f"Expected 307 atividades in L17, got {data['pagination']['total']}"
+
+
+def test_atividades_votes_l17_count_77():
+    """
+    REGRESSION: L17 should have exactly 77 votes from atividades.
+
+    This is a known constant from the atividades_votacoes transformation.
+    Validates vote extraction accuracy.
+    """
+    response = client.get("/api/v1/atividades/votacoes/?legislatura=L17&limit=500")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["pagination"]["total"] == 77, \
+        f"Expected 77 atividades votes in L17, got {data['pagination']['total']}"
+
+
+def test_has_party_details_implies_detalhe_not_null():
+    """
+    REGRESSION: has_party_details flag must be accurate.
+
+    When has_party_details=true, the vote must have a non-null detalhe field
+    with parsed party voting data. This validates the data quality flag integrity.
+    """
+    # Get votes with party details
+    response = client.get("/api/v1/atividades/votacoes/?has_party_details=true&limit=10")
+    assert response.status_code == 200
+
+    votes = response.json()["data"]
+
+    # Get detailed info for each vote
+    for vote in votes:
+        detail_response = client.get(f"/api/v1/atividades/votacoes/{vote['vot_id']}")
+        assert detail_response.status_code == 200
+
+        detail = detail_response.json()
+
+        # Must have party details flag set
+        assert detail["has_party_details"] is True, \
+            f"Vote {vote['vot_id']} claims has_party_details=true but flag is false"
+
+        # Must have detalhe_parsed structure
+        assert detail["detalhe_parsed"] is not None, \
+            f"Vote {vote['vot_id']} has has_party_details=true but detalhe_parsed is null"
+
+        # Verify structure
+        parsed = detail["detalhe_parsed"]
+        assert "a_favor" in parsed
+        assert "contra" in parsed
+        assert "abstencao" in parsed
+        assert isinstance(parsed["a_favor"], list)
+
+
+def test_has_party_details_false_implies_no_parsed_data():
+    """
+    REGRESSION: Votes without party details should not have parsed data.
+
+    When has_party_details=false, detalhe_parsed should be null or empty.
+    This validates the data quality flag integrity in the opposite direction.
+    """
+    # Get votes without party details
+    response = client.get("/api/v1/atividades/votacoes/?has_party_details=false&limit=10")
+    assert response.status_code == 200
+
+    votes = response.json()["data"]
+
+    if votes:  # Only test if there are votes without party details
+        # Get detailed info for first vote
+        detail_response = client.get(f"/api/v1/atividades/votacoes/{votes[0]['vot_id']}")
+        assert detail_response.status_code == 200
+
+        detail = detail_response.json()
+
+        # Must have party details flag set to false
+        assert detail["has_party_details"] is False
+
+        # detalhe_parsed should be null
+        assert detail["detalhe_parsed"] is None, \
+            f"Vote {votes[0]['vot_id']} has has_party_details=false but detalhe_parsed is not null"
+
+
+def test_vote_source_breakdown_sum_correct():
+    """
+    REGRESSION: Vote source breakdown totals must equal sum of iniciativas + atividades.
+
+    The stats endpoint provides vote_source_breakdown showing votes from both sources.
+    The total field must equal iniciativas + atividades.
+    """
+    response = client.get("/api/v1/stats/?legislatura=L17")
+    assert response.status_code == 200
+
+    data = response.json()
+    stats = data["data"]
+
+    # Vote source breakdown should exist
+    assert stats["vote_source_breakdown"] is not None, \
+        "vote_source_breakdown should be present in stats"
+
+    breakdown = stats["vote_source_breakdown"]
+
+    # Verify sum
+    expected_total = breakdown["iniciativas"] + breakdown["atividades"]
+    assert breakdown["total"] == expected_total, \
+        f"vote_source_breakdown total mismatch: {breakdown['total']} != {expected_total}"
+
+    # For L17, we know atividades should be 77
+    assert breakdown["atividades"] == 77, \
+        f"L17 should have 77 atividades votes, got {breakdown['atividades']}"
+
+
+def test_atividades_synthetic_id_format():
+    """
+    REGRESSION: Atividades must have synthetic IDs in correct format.
+
+    IDs should be either:
+    - Composite key: {legislatura}_{tipo}_{numero} (when numero exists)
+    - MD5 hash: {legislatura}_{md5_hash} (when numero is null)
+
+    This validates the ETL synthetic ID generation.
+    """
+    response = client.get("/api/v1/atividades/?legislatura=L17&limit=10")
+    assert response.status_code == 200
+
+    activities = response.json()["data"]
+    assert len(activities) > 0, "Should have activities for L17"
+
+    for activity in activities:
+        ativ_id = activity["ativ_id"]
+
+        # Must start with legislatura
+        assert ativ_id.startswith("L17_"), \
+            f"Activity ID should start with 'L17_', got {ativ_id}"
+
+        # Must not be empty after prefix
+        assert len(ativ_id) > len("L17_"), \
+            f"Activity ID too short: {ativ_id}"
+
+
+def test_atividades_filter_by_tipo_correctness():
+    """
+    REGRESSION: tipo filter should only return activities of that type.
+
+    Verifies that the tipo filter correctly filters atividades by their ativ_tipo field.
+    """
+    # Test filtering for VOT type
+    response = client.get("/api/v1/atividades/?tipo=VOT&legislatura=L17&limit=50")
+    assert response.status_code == 200
+
+    data = response.json()
+    activities = data["data"]
+
+    # Should have some VOT activities (most common type)
+    assert len(activities) > 0, "Should have VOT activities in L17"
+
+    # All returned activities must be type VOT
+    for activity in activities:
+        assert activity["ativ_tipo"] == "VOT", \
+            f"Expected tipo=VOT, got {activity['ativ_tipo']}"
+
+
+def test_atividades_votes_have_source_field():
+    """
+    REGRESSION: All atividades votes must have source='atividade'.
+
+    This discriminator field distinguishes votes from atividades vs iniciativas.
+    Critical for data provenance tracking.
+    """
+    response = client.get("/api/v1/atividades/votacoes/?limit=10")
+    assert response.status_code == 200
+
+    votes = response.json()["data"]
+
+    if votes:
+        # Get detailed info for first vote
+        vot_id = votes[0]["vot_id"]
+        detail_response = client.get(f"/api/v1/atividades/votacoes/{vot_id}")
+        assert detail_response.status_code == 200
+
+        detail = detail_response.json()
+
+        # Must have source field set to 'atividade'
+        assert "source" in detail, "Vote must have 'source' field"
+        assert detail["source"] == "atividade", \
+            f"Expected source='atividade', got {detail['source']}"
+
+
+def test_atividades_by_tipo_in_stats():
+    """
+    REGRESSION: Stats endpoint must include atividades_by_tipo aggregation.
+
+    For L17, should show VOT as dominant type (~95% of activities).
+    Validates stats aggregation correctness.
+    """
+    response = client.get("/api/v1/stats/?legislatura=L17")
+    assert response.status_code == 200
+
+    data = response.json()
+    stats = data["data"]
+
+    # Should have atividades_by_tipo
+    assert "atividades_by_tipo" in stats
+    assert isinstance(stats["atividades_by_tipo"], list)
+
+    # Should have at least one type
+    assert len(stats["atividades_by_tipo"]) > 0, \
+        "Should have at least one activity type in L17"
+
+    # VOT should be the most common type
+    tipo_counts = {item["tipo"]: item["count"] for item in stats["atividades_by_tipo"]}
+    assert "VOT" in tipo_counts, "VOT should be present in atividades types"
+
+    # VOT should be majority (>= 280 out of 307)
+    assert tipo_counts["VOT"] >= 280, \
+        f"VOT should be dominant type, got {tipo_counts['VOT']} out of 307"

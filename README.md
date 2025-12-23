@@ -14,8 +14,9 @@ This project is the core component behind http://api.votoaberto.org
 
 ## Features
 
-* **17+ REST API Endpoints** - Initiatives, votes, deputies, parties, circles... the list will grow.
+* **21+ REST API Endpoints** - Initiatives, votes, deputies, parties, circles, activities (atividades)... the list will grow.
 * **Filtering** - By date, party, type, author, and more (depending on the endpoint). Covers the most common tasks, including searching within titles.
+* **Data quality transparency** - Activity votes include `has_party_details` flag showing data completeness
 * **Fast queries** (hopefully). DuckDB on Parquet files is quite speedy, with <100ms query times for all tested queries.
 * **OpenAPI documentation** - Interactive Swagger UI + ReDoc
 * **Data validation** - Pydantic validation on requests/responses
@@ -147,6 +148,21 @@ curl 'http://localhost:8000/api/v1/iniciativas/315199/eventos'
 
 # Filter events by type and date
 curl 'http://localhost:8000/api/v1/iniciativas/315199/eventos?evento_fase=Entrada&data_desde=2025-06-01'
+
+# List atividades (parliamentary activities)
+curl 'http://localhost:8000/api/v1/atividades/?legislatura=L17&limit=10'
+
+# Filter atividades by type
+curl 'http://localhost:8000/api/v1/atividades/?tipo=VOT&limit=10'
+
+# List votes from atividades
+curl 'http://localhost:8000/api/v1/atividades/votacoes/?legislatura=L17&limit=10'
+
+# Filter atividades votes with complete party voting data
+curl 'http://localhost:8000/api/v1/atividades/votacoes/?has_party_details=true&limit=10'
+
+# Get statistics including atividades breakdown
+curl 'http://localhost:8000/api/v1/stats/?legislatura=L17'
 ```
 
 ## Architecture and components
@@ -293,13 +309,21 @@ parlamentodb/
 │   ├── dependencies.py      # Shared dependencies (DuckDB connection)
 │   ├── routers/             # API endpoints
 │   │   ├── iniciativas.py   # /api/v1/iniciativas
-│   │   ├── votacoes.py      # /api/v1/votacoes
+│   │   ├── votacoes.py      # /api/v1/iniciativas/votacoes
+│   │   ├── atividades.py    # /api/v1/atividades (NEW)
 │   │   ├── deputados.py     # /api/v1/deputados
 │   │   ├── circulos.py      # /api/v1/circulos
 │   │   ├── partidos.py      # /api/v1/partidos
+│   │   ├── stats.py         # /api/v1/stats
 │   │   ├── legislaturas.py  # /api/v1/legislaturas
 │   │   └── health.py        # /health
 │   └── models/              # Pydantic response models
+│       ├── iniciativa.py
+│       ├── votacao.py
+│       ├── atividade.py     # Atividades models (NEW)
+│       ├── deputado.py
+│       ├── stats.py
+│       └── ...
 ├── etl/                     # ETL pipeline
 │   ├── fetch.py            # Download JSON from parlamento.pt
 │   ├── transform.py        # JSON -> Parquet transformation
@@ -307,7 +331,7 @@ parlamentodb/
 ├── data/
 │   ├── bronze/             # Raw JSON files
 │   └── silver/             # Normalized Parquet files
-├── tests/                  # Test suite 
+├── tests/                  # Test suite
 ├── docker-compose.yml      # Local deployment
 ├── Dockerfile              # Production deployment
 ├── pyproject.toml          # Poetry dependencies
@@ -322,12 +346,16 @@ https://www.parlamento.pt/Cidadania/Paginas/DadosAbertos.aspx
 All data is publicly available under the Assembleia da República open data initiative. This API provides structured access to:
 
 - Legislative initiatives (Iniciativas)
-- Voting sessions (Votações)
+- Voting sessions from initiatives (Votações)
+- Parliamentary activities (Atividades) - condemnation votes, motions, elections, etc.
+- Voting sessions from activities (Atividades Votações)
 - Deputy information (Deputados)
 - Parliamentary groups (Partidos)
 - Electoral circles (Círculos)
 
-The information used is, for now, the one on the "Iniciativas" and "Informação Base" pages.
+**Note on Atividades Data Quality**: Only 8-20% of atividades votes include complete party voting details: this is not a bug, and it's not even an error, it's due to the fact that many of the these votes are approved unanimously, and the source data register the approval, the fact that it was unanimous, and does not fill in the "detalhe" field for those votes since it's assumed that everyone voted in favour. The API includes a `has_party_details` flag to filter for complete data or handle incomplete records appropriately, just in case it's needed.
+
+The information used is from the "Iniciativas", "Atividades", and "Informação Base" data sources.
 ---
 
 ## Related Projects

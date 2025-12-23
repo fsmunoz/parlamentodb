@@ -107,15 +107,68 @@ class PartyVoteTypeStats(BaseModel):
     }
 
 
+class AtividadesByTipo(BaseModel):
+    """Activity count statistics grouped by activity type."""
+
+    tipo: str = Field(..., description="Activity type (VOT, MOC, PRG, OEX, SES, ITG)")
+    count: int = Field(..., description="Number of activities of this type")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
+                "tipo": "VOT",
+                "count": 286
+            }]
+        }
+    }
+
+
+class AtividadesVotesByTipo(BaseModel):
+    """Vote count statistics from atividades grouped by activity type."""
+
+    tipo: str = Field(..., description="Activity type")
+    vote_count: int = Field(..., description="Number of votes from this activity type")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
+                "tipo": "VOT",
+                "vote_count": 65
+            }]
+        }
+    }
+
+
+class VoteSourceBreakdown(BaseModel):
+    """Vote source breakdown (iniciativas vs atividades)."""
+
+    iniciativas: int = Field(..., description="Number of votes from iniciativas")
+    atividades: int = Field(..., description="Number of votes from atividades")
+    total: int = Field(..., description="Total votes across both sources")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
+                "iniciativas": 3792,
+                "atividades": 327,
+                "total": 4119
+            }]
+        }
+    }
+
+
 class LegislaturaStats(BaseModel):
     """
     Comprehensive statistics for a single legislature.
 
-    Contains 4 fundamental aggregations:
+    Contains 7 fundamental aggregations:
     1. Initiatives by fase outcome
     2. Initiatives by party with fase breakdowns
     3. Votes by event type
     4. Votes by party and vote type
+    5. Atividades by type (NEW)
+    6. Atividades votes by type (NEW)
+    7. Vote source breakdown (NEW)
     """
 
     legislatura: str = Field(..., description="Legislature identifier (L15, L16, L17)")
@@ -138,6 +191,21 @@ class LegislaturaStats(BaseModel):
     votes_by_party_and_type: list[PartyVoteTypeStats] = Field(
         ...,
         description="Vote counts grouped first by party, then by vote type"
+    )
+
+    atividades_by_tipo: list[AtividadesByTipo] = Field(
+        default_factory=list,
+        description="Activity counts grouped by type (VOT, MOC, PRG, etc.)"
+    )
+
+    atividades_votes_by_tipo: list[AtividadesVotesByTipo] = Field(
+        default_factory=list,
+        description="Vote counts from atividades grouped by activity type"
+    )
+
+    vote_source_breakdown: VoteSourceBreakdown | None = Field(
+        None,
+        description="Breakdown of votes by source (iniciativas vs atividades)"
     )
 
     model_config = {

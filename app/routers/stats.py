@@ -25,6 +25,9 @@ from app.models.stats import (
     PartyFaseOutcome,
     VotesByEventType,
     PartyVoteTypeStats,
+    AtividadesByTipo,
+    AtividadesVotesByTipo,
+    VoteSourceBreakdown,
 )
 from app.models.common import APIMeta
 from app.models.validators import validate_legislatura
@@ -47,7 +50,7 @@ def get_legislature_stats(
     """
     Get important statistics for a legislature.
 
-    Returns 4 fundamental aggregations computed on-demand:
+    Returns 7 fundamental aggregations computed on-demand:
 
     1. **Initiatives by fase**: Total initiatives grouped by phase and outcome
        - Shows vote outcomes (Aprovado/Rejeitado) per legislative phase
@@ -64,12 +67,22 @@ def get_legislature_stats(
     4. **Votes by party and type**: Detailed voting behavior by party
        - Grouped first by party, then by vote type
        - Vote types: A Favor (For), Contra (Against), Abstenção (Abstention)
-    
-    These have been chosen while developing clients, since getting these information
+
+    5. **Atividades by type**: Activity counts grouped by type (NEW)
+       - Count of atividades (VOT, MOC, PRG, etc.)
+
+    6. **Atividades votes by type**: Vote counts from atividades (NEW)
+       - How many votes each activity type generated
+
+    7. **Vote source breakdown**: Total votes by source (NEW)
+       - Breakdown of all votes: iniciativas vs atividades
+       - Enables clients to see complete parliamentary voting coverage
+
+    These have been chosen while developing clients, since getting this information
     would require many API calls.
-    
+
     Uses on-demand SQL aggregation using DuckDB on Parquet files (performance is great).
-    
+
     """
     try:
         # Validate input
@@ -129,13 +142,74 @@ def get_legislature_stats(
             for row in agg4_results
         ]
 
+        # Aggregation #5: Atividades by tipo (if atividades exist)
+        atividades_by_tipo = []
+        try:
+            agg5_query = """
+                SELECT ativ_tipo, COUNT(*) as count
+                FROM atividades
+                WHERE legislatura = $legislatura
+                  AND ativ_tipo IS NOT NULL
+                GROUP BY ativ_tipo
+                ORDER BY count DESC
+            """
+            agg5_results = db.execute(agg5_query, {"legislatura": legislatura}).fetchall()
+            atividades_by_tipo = [
+                AtividadesByTipo(tipo=row[0], count=row[1])
+                for row in agg5_results
+            ]
+        except Exception as e:
+            logger.warning("atividades_by_tipo_failed", error=str(e))
+
+        # Aggregation #6: Atividades votes by tipo (if atividades_votacoes exist)
+        atividades_votes_by_tipo = []
+        try:
+            agg6_query = """
+                SELECT tipo, COUNT(*) as vote_count
+                FROM atividades_votacoes
+                WHERE legislatura = $legislatura
+                  AND tipo IS NOT NULL
+                GROUP BY tipo
+                ORDER BY vote_count DESC
+            """
+            agg6_results = db.execute(agg6_query, {"legislatura": legislatura}).fetchall()
+            atividades_votes_by_tipo = [
+                AtividadesVotesByTipo(tipo=row[0], vote_count=row[1])
+                for row in agg6_results
+            ]
+        except Exception as e:
+            logger.warning("atividades_votes_by_tipo_failed", error=str(e))
+
+        # Aggregation #7: Vote source breakdown
+        vote_source_breakdown = None
+        try:
+            agg7_query = """
+                SELECT
+                    (SELECT COUNT(*) FROM votacoes WHERE legislatura = $legislatura) as iniciativas,
+                    (SELECT COALESCE(COUNT(*), 0) FROM atividades_votacoes WHERE legislatura = $legislatura) as atividades
+            """
+            agg7_result = db.execute(agg7_query, {"legislatura": legislatura}).fetchone()
+            if agg7_result:
+                iniciativas_count = agg7_result[0]
+                atividades_count = agg7_result[1]
+                vote_source_breakdown = VoteSourceBreakdown(
+                    iniciativas=iniciativas_count,
+                    atividades=atividades_count,
+                    total=iniciativas_count + atividades_count
+                )
+        except Exception as e:
+            logger.warning("vote_source_breakdown_failed", error=str(e))
+
         # Construct response
         stats = LegislaturaStats(
             legislatura=legislatura,
             initiatives_by_fase=initiatives_by_fase,
             initiatives_by_party=initiatives_by_party,
             votes_by_event_type=votes_by_event_type,
-            votes_by_party_and_type=votes_by_party_and_type
+            votes_by_party_and_type=votes_by_party_and_type,
+            atividades_by_tipo=atividades_by_tipo,
+            atividades_votes_by_tipo=atividades_votes_by_tipo,
+            vote_source_breakdown=vote_source_breakdown
         )
 
         logger.info(
@@ -144,7 +218,10 @@ def get_legislature_stats(
             initiatives_by_fase_count=len(initiatives_by_fase),
             parties_count=len(initiatives_by_party),
             event_types_count=len(votes_by_event_type),
-            party_vote_records_count=len(votes_by_party_and_type)
+            party_vote_records_count=len(votes_by_party_and_type),
+            atividades_types_count=len(atividades_by_tipo),
+            atividades_votes_types_count=len(atividades_votes_by_tipo),
+            vote_source_breakdown=vote_source_breakdown is not None
         )
 
         return StatsResponse(

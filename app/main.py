@@ -7,12 +7,12 @@ Main FastAPI application entry point with router registration and middleware.
 """
 
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 import structlog
 
 from app.config import settings
-from app.routers import health, iniciativas, votacoes, legislaturas, deputados, circulos, partidos, stats
+from app.routers import health, iniciativas, votacoes, legislaturas, deputados, circulos, partidos, stats, atividades
 
 logger = structlog.get_logger()
 
@@ -39,6 +39,7 @@ app.include_router(legislaturas.router)
 app.include_router(deputados.router)
 app.include_router(circulos.router)
 app.include_router(partidos.router)
+app.include_router(atividades.router)
 app.include_router(stats.router)
 
 
@@ -91,6 +92,26 @@ def validate_data_files():
         parquet_files_count=len(all_files),
         files=[f.name for f in all_files]
     )
+
+
+# Backward compatibility redirects for API restructuring
+# Old /votacoes -> New /iniciativas/votacoes
+# We might DROP this soon-ish...
+
+@app.get("/api/v1/votacoes/", include_in_schema=False)
+@app.get("/api/v1/votacoes/{vot_id}", include_in_schema=False)
+async def redirect_old_votacoes(request: Request):
+    """
+    Redirect old /votacoes URLs to new /iniciativas/votacoes for backward compatibility.
+
+    HTTP 301 Permanent Redirect signals to clients that the resource has moved permanently.
+    Query parameters are preserved in the redirect.
+    """
+    # Replace the old path with the new path
+    new_path = request.url.path.replace("/api/v1/votacoes", "/api/v1/iniciativas/votacoes")
+    # Preserve query parameters
+    new_url = str(request.url).replace(request.url.path, new_path)
+    return RedirectResponse(url=new_url, status_code=301)
 
 
 # Redirect to /docs ... could be /redocs as well, but /docs looks
