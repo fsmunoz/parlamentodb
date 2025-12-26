@@ -204,20 +204,21 @@ The used data tiers are:
 2. `silver`: Parquet files, the result of the transformation process.
 3. `gold`: not currently used, but reserved for files with new data (derivatives of the original one)
 
-To run the ETL steps:
+To run the ETL pipeline:
 
 ```bash
-# Activate environment
-source .venv/bin/activate
+# All legislatures (default)
+make etl-all
 
-# Fetch latest data from parlament.pt
-python -m etl.fetch
+# Latest legislature only (L17) - faster for daily updates
+make etl-latest
 
-# Transform to Parquet
-python -m etl.transform
+# Specific legislature
+python -m etl -l L16
+python -m etl.transform -l L16
 ```
 
-... or `make etl-fetch` and `make etl-transform`.
+See the **ETL Pipeline** section below for comprehensive examples and options.
 
 ## Testing
 
@@ -245,16 +246,57 @@ The API serves data processed through an ETL pipeline that:
 
 ### Running the ETL
 
+**All legislatures (default)**:
 ```bash
-# Fetch raw JSON from parlamento.pt
-poetry run python -m etl.fetch
+# Fetch + transform all legislatures (L13-L17)
+make etl-all
 
-# Transform JSON → Parquet
-poetry run python -m etl.transform
+# Or step by step:
+make etl-fetch      # Fetch all
+make etl-transform  # Transform all
 
-# Data lands in data/silver/*.parquet
-# API automatically picks up new data
+# Or directly with Python:
+python -m etl              # Fetch all
+python -m etl.transform    # Transform all
 ```
+
+**Single legislature (faster)**:
+```bash
+# Fetch + transform latest legislature only (L17)
+make etl-latest
+
+# Or step by step:
+make etl-fetch-latest      # Fetch L17 only
+make etl-transform-latest  # Transform L17 only
+
+# Or directly with Python:
+python -m etl -l L17              # Fetch L17 only
+python -m etl.transform -l L17    # Transform L17 only
+
+# Multiple specific legislatures:
+python -m etl -l L17,L16          # Fetch L17 and L16
+python -m etl.transform -l L17,L16
+```
+
+**Parameterized (any legislature)**:
+```bash
+# Fetch + transform specific legislature via Makefile variable
+make etl-fetch-leg LEG=L16
+make etl-transform-leg LEG=L16
+```
+
+**With flags**:
+```bash
+# Skip atividades for faster processing
+python -m etl -l L17 --skip-atividades
+python -m etl.transform -l L17 --skip-atividades
+
+# See all options
+python -m etl --help
+python -m etl.transform --help
+```
+
+Data lands in `data/silver/*.parquet` and the API automatically picks up new data.
 
 ### Data Layers
 

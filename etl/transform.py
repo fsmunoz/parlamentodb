@@ -1047,17 +1047,89 @@ def transform_all(
 
 
 if __name__ == "__main__":
-    print("==> Starting ETL transform")
-    # Transform all legislatures with main transformations
+    import argparse
+    import sys
+
+    def parse_args():
+        """Parse command-line arguments."""
+        parser = argparse.ArgumentParser(
+            description="Transform Portuguese Parliament data (JSON → Parquet)"
+        )
+        parser.add_argument(
+            "-l", "--legislature",
+            type=str,
+            help="Legislature(s) to transform (e.g., L17 or L17,L16). If not specified, transforms all."
+        )
+        parser.add_argument(
+            "--skip-info-base",
+            action="store_true",
+            help="Skip transforming info_base (metadata) files"
+        )
+        parser.add_argument(
+            "--skip-votacoes",
+            action="store_true",
+            help="Skip transforming votacoes (votes from iniciativas)"
+        )
+        parser.add_argument(
+            "--skip-deputados",
+            action="store_true",
+            help="Skip transforming deputados (deputies)"
+        )
+        parser.add_argument(
+            "--skip-circulos",
+            action="store_true",
+            help="Skip transforming circulos (electoral circles)"
+        )
+        parser.add_argument(
+            "--skip-partidos",
+            action="store_true",
+            help="Skip transforming partidos (parties)"
+        )
+        parser.add_argument(
+            "--skip-atividades",
+            action="store_true",
+            help="Skip transforming atividades (activities)"
+        )
+        parser.add_argument(
+            "--skip-atividades-votacoes",
+            action="store_true",
+            help="Skip transforming atividades votacoes (activity votes)"
+        )
+        return parser.parse_args()
+
+    args = parse_args()
+
+    # Parse legislature list
+    legislatures = None
+    if args.legislature:
+        legislatures = [leg.strip() for leg in args.legislature.split(",")]
+
+        # Validate legislature codes
+        invalid = [leg for leg in legislatures if leg not in config.LEGISLATURES]
+        if invalid:
+            available = ", ".join(config.LEGISLATURES.keys())
+            print(f"Error: Unknown legislature(s): {', '.join(invalid)}", file=sys.stderr)
+            print(f"Available legislatures: {available}", file=sys.stderr)
+            sys.exit(1)
+
+    # Display what we're transforming
+    if legislatures:
+        print(f"==> Transforming legislatures: {', '.join(legislatures)}")
+    else:
+        print("==> Transforming all legislatures")
+
+    # Call transform_all with parsed arguments
     results = transform_all(
-        include_info_base=True,
-        include_votacoes=True,
-        include_deputados=True,
-        include_circulos=True,
-        include_partidos=True,
-        include_atividades=True,
-        include_atividades_votacoes=True
+        legislatures=legislatures,
+        include_info_base=not args.skip_info_base,
+        include_votacoes=not args.skip_votacoes,
+        include_deputados=not args.skip_deputados,
+        include_circulos=not args.skip_circulos,
+        include_partidos=not args.skip_partidos,
+        include_atividades=not args.skip_atividades,
+        include_atividades_votacoes=not args.skip_atividades_votacoes
     )
+
     print(f"==> Transform completed. Results: {len(results)} legislatures processed")
     for leg, paths in results.items():
         print(f"  - {leg}: {list(paths.keys())}")

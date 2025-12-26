@@ -161,6 +161,29 @@ etl-transform:
 etl-all: etl-fetch etl-transform
 	@echo "==> ETL pipeline complete"
 
+# ETL targets for latest legislature only (L17)
+etl-fetch-latest:
+	@echo "==> Fetching latest legislature (L17) only..."
+	. .venv/bin/activate && python -m etl -l L17
+
+etl-transform-latest:
+	@echo "==> Transforming latest legislature (L17) only..."
+	. .venv/bin/activate && python -m etl.transform -l L17
+
+etl-latest: etl-fetch-latest etl-transform-latest
+	@echo "==> ETL pipeline complete (L17 only)"
+
+# Parameterized ETL targets (usage: make etl-fetch-leg LEG=L17)
+etl-fetch-leg:
+	@test -n "$(LEG)" || (echo "Error: LEG variable required. Usage: make etl-fetch-leg LEG=L17" && exit 1)
+	@echo "==> Fetching legislature $(LEG)..."
+	. .venv/bin/activate && python -m etl -l $(LEG)
+
+etl-transform-leg:
+	@test -n "$(LEG)" || (echo "Error: LEG variable required. Usage: make etl-transform-leg LEG=L17" && exit 1)
+	@echo "==> Transforming legislature $(LEG)..."
+	. .venv/bin/activate && python -m etl.transform -l $(LEG)
+
 
 # Cleanup targets
 # ==============================================================================
