@@ -12,7 +12,7 @@ from fastapi.responses import RedirectResponse
 import structlog
 
 from app.config import settings
-from app.routers import health, iniciativas, votacoes, legislaturas, deputados, circulos, partidos, stats, atividades
+from app.routers import health, iniciativas, votacoes, legislaturas, deputados, circulos, partidos, stats, atividades, cap
 
 logger = structlog.get_logger()
 
@@ -40,6 +40,7 @@ app.include_router(deputados.router)
 app.include_router(circulos.router)
 app.include_router(partidos.router)
 app.include_router(atividades.router)
+app.include_router(cap.router)
 app.include_router(stats.router)
 
 

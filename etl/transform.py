@@ -937,6 +937,92 @@ def transform_atividades_votacoes(
         raise TransformError(f"Error transforming atividades_votacoes for {legislature}: {e}")
 
 
+def transform_cap(
+    legislature: str,
+    cap_source_path: Path | None = None,
+    silver_path: Path | None = None,
+) -> Path | None:
+    """
+    Convert a CAP mapping CSV into a Parquet file in the silver layer.
+
+    The source CSV is produced by the votoaberto-cap project's classify.py
+    and committed into data/cap_source/cap_<leg>.csv. If the CSV does not
+    exist this function logs a warning and returns None (graceful skip).
+
+    Columns in source CSV: ini_id, legislatura, cap, cap_label, model_version
+    These are written as-is to the Parquet file.
+
+    Args:
+        legislature: Legislature ID (e.g., "L17")
+        cap_source_path: Input CSV path (default: config.CAP_SOURCE_DIR / cap_<leg>.csv)
+        silver_path: Output Parquet path (default: config.SILVER_DIR / cap_<leg>.parquet)
+
+    Returns:
+        Path to created Parquet file, or None if CSV source is absent.
+
+    Raises:
+        TransformError: If the CSV exists but conversion fails.
+    """
+    if cap_source_path is None:
+        cap_source_path = config.CAP_SOURCE_DIR / f"cap_{legislature.lower()}.csv"
+
+    if silver_path is None:
+        silver_path = config.SILVER_DIR / f"cap_{legislature.lower()}.parquet"
+
+    if not cap_source_path.exists():
+        logger.info(
+            "transform_cap_skipped",
+            legislature=legislature,
+            reason="source CSV not found",
+            path=str(cap_source_path),
+        )
+        return None
+
+    logger.info("transform_cap_start", legislature=legislature, input=str(cap_source_path))
+
+    try:
+        conn = duckdb.connect()
+        conn.execute(f"SET memory_limit='{config.DUCKDB_MEMORY_LIMIT}'")
+        conn.execute(f"SET threads={config.DUCKDB_THREADS}")
+
+        query = f"""
+            COPY (
+                SELECT
+                    ini_id::VARCHAR         AS ini_id,
+                    legislatura::VARCHAR    AS legislatura,
+                    cap::INTEGER            AS cap,
+                    cap_label::VARCHAR      AS cap_label,
+                    model_version::VARCHAR  AS model_version
+                FROM read_csv_auto('{cap_source_path}', header=true)
+                ORDER BY legislatura, ini_id
+            ) TO '{silver_path}' (
+                FORMAT PARQUET,
+                COMPRESSION '{config.PARQUET_COMPRESSION}',
+                ROW_GROUP_SIZE {config.PARQUET_ROW_GROUP_SIZE}
+            )
+        """
+        conn.execute(query)
+        conn.close()
+
+        record_count = duckdb.execute(f"SELECT count(*) FROM '{silver_path}'").fetchone()[0]
+        size_kb = round(silver_path.stat().st_size / 1024.0, 1)
+
+        logger.info(
+            "transform_cap_complete",
+            legislature=legislature,
+            records=record_count,
+            size_kb=size_kb,
+        )
+        return silver_path
+
+    except duckdb.Error as e:
+        logger.error("duckdb_error", legislature=legislature, error=str(e))
+        raise TransformError(f"DuckDB error in transform_cap: {e}")
+    except Exception as e:
+        logger.error("transform_error", legislature=legislature, error=str(e))
+        raise TransformError(f"Error transforming CAP for {legislature}: {e}")
+
+
 def transform_all(
     legislatures: list[str] | None = None,
     include_info_base: bool = True,
@@ -945,7 +1031,8 @@ def transform_all(
     include_circulos: bool = False,
     include_partidos: bool = False,
     include_atividades: bool = True,
-    include_atividades_votacoes: bool = True
+    include_atividades_votacoes: bool = True,
+    include_cap: bool = True,
 ) -> dict[str, dict[str, Path]]:
     """
     Transform multiple legislatures and their metadata.
@@ -959,6 +1046,7 @@ def transform_all(
         include_partidos: Also create flattened partidos file
         include_atividades: Also transform Atividades data
         include_atividades_votacoes: Also create flattened atividades_votacoes file
+        include_cap: Convert CAP mapping CSV → Parquet if cap_source CSV is present
 
     Returns:
         Dict mapping legislature ID to {
@@ -969,7 +1057,8 @@ def transform_all(
             "circulos": Path | None,
             "partidos": Path | None,
             "atividades": Path | None,
-            "atividades_votacoes": Path | None
+            "atividades_votacoes": Path | None,
+            "cap": Path | None,
         }
     """
     if legislatures is None:
@@ -1040,6 +1129,15 @@ def transform_all(
             except TransformError as e:
                 logger.error("transform_atividades_votacoes_failed", legislature=leg, error=str(e))
 
+        # Transform CAP mapping (optional - skipped silently if source CSV absent)
+        if include_cap:
+            try:
+                cap_path = transform_cap(leg)
+                if cap_path:
+                    leg_results["cap"] = cap_path
+            except TransformError as e:
+                logger.error("transform_cap_failed", legislature=leg, error=str(e))
+
         if leg_results:
             results[leg] = leg_results
 
@@ -1095,6 +1193,11 @@ if __name__ == "__main__":
             action="store_true",
             help="Skip transforming atividades votacoes (activity votes)"
         )
+        parser.add_argument(
+            "--skip-cap",
+            action="store_true",
+            help="Skip converting CAP mapping CSV to Parquet"
+        )
         return parser.parse_args()
 
     args = parse_args()
@@ -1127,7 +1230,8 @@ if __name__ == "__main__":
         include_circulos=not args.skip_circulos,
         include_partidos=not args.skip_partidos,
         include_atividades=not args.skip_atividades,
-        include_atividades_votacoes=not args.skip_atividades_votacoes
+        include_atividades_votacoes=not args.skip_atividades_votacoes,
+        include_cap=not args.skip_cap,
     )
 
     print(f"==> Transform completed. Results: {len(results)} legislatures processed")

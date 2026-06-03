@@ -24,10 +24,12 @@ BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 BRONZE_DIR = DATA_DIR / "bronze"
 SILVER_DIR = DATA_DIR / "silver"
+CAP_SOURCE_DIR = DATA_DIR / "cap_source"  # Committed CAP mapping CSVs from votoaberto-cap
 
 # Ensure directories exist
 BRONZE_DIR.mkdir(parents=True, exist_ok=True)
 SILVER_DIR.mkdir(parents=True, exist_ok=True)
+CAP_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Legislature configurations (last 3 legislatures only).
 #

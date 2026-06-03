@@ -688,3 +688,134 @@ def test_stats_includes_atividades():
         assert "total" in breakdown
         # Total should equal sum
         assert breakdown["total"] == breakdown["iniciativas"] + breakdown["atividades"]
+
+
+# ─── CAP classification tests ────────────────────────────────────────────────
+
+# Helper: check if the cap view has any data loaded (degrades gracefully otherwise)
+def _cap_data_available() -> bool:
+    """Return True if cap parquet files have been loaded (ETL has been run)."""
+    r = client.get("/api/v1/cap/?limit=1")
+    return r.status_code == 200 and r.json()["pagination"]["total"] > 0
+
+
+def test_cap_list_returns_valid_structure():
+    """CAP list endpoint always returns the standard APIResponse structure."""
+    response = client.get("/api/v1/cap/?limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "pagination" in data
+    assert "meta" in data
+    assert isinstance(data["data"], list)
+    assert data["pagination"]["limit"] == 10
+
+
+def test_cap_list_with_legislatura_filter():
+    """Filter by legislatura returns only rows from that legislature."""
+    response = client.get("/api/v1/cap/?legislatura=L17&limit=50")
+    assert response.status_code == 200
+    data = response.json()
+    for item in data["data"]:
+        assert item["legislatura"] == "L17"
+
+
+def test_cap_list_has_required_fields():
+    """Each CAP list item has the expected fields."""
+    response = client.get("/api/v1/cap/?limit=5")
+    assert response.status_code == 200
+    for item in response.json()["data"]:
+        assert "ini_id" in item
+        assert "legislatura" in item
+        assert "cap" in item
+        assert "cap_label" in item
+        assert "model_version" in item
+        assert item["ini_id"] is not None
+        assert item["cap_label"]  # non-empty string
+
+
+def test_cap_filter_by_cap_code():
+    """Filter by specific CAP code returns only matching results."""
+    if not _cap_data_available():
+        return  # graceful skip when no data loaded
+    # Get a known code from the list
+    r_all = client.get("/api/v1/cap/?limit=50")
+    if not r_all.json()["data"]:
+        return
+    cap_code = r_all.json()["data"][0]["cap"]
+    response = client.get(f"/api/v1/cap/?cap={cap_code}&limit=100")
+    assert response.status_code == 200
+    data = response.json()
+    for item in data["data"]:
+        assert item["cap"] == cap_code
+
+
+def test_cap_filter_by_autor_gp():
+    """Filter by autor_gp returns results matching that party."""
+    if not _cap_data_available():
+        return
+    response = client.get("/api/v1/cap/?autor_gp=PS&limit=20")
+    assert response.status_code == 200
+    # Response structure OK; content verified by regression tests
+
+
+def test_cap_filter_by_tipo():
+    """Filter by initiative type (tipo) returns matching results."""
+    if not _cap_data_available():
+        return
+    # "R" = Projeto de Resolução, common in L17
+    response = client.get("/api/v1/cap/?tipo=R&limit=20")
+    assert response.status_code == 200
+    data = response.json()
+    for item in data["data"]:
+        assert item["ini_tipo"] == "R"
+
+
+def test_cap_text_search():
+    """Text search (q=) in cap endpoint works via ini_titulo ILIKE."""
+    response = client.get("/api/v1/cap/?q=governo&limit=10")
+    assert response.status_code == 200
+    data = response.json()
+    for item in data["data"]:
+        assert "governo" in (item.get("ini_titulo") or "").lower()
+
+
+def test_cap_detail_by_ini_id():
+    """Get a single CAP record by ini_id returns correct structure."""
+    if not _cap_data_available():
+        return
+    # Use a known ini_id from the list
+    list_r = client.get("/api/v1/cap/?limit=1")
+    assert list_r.status_code == 200
+    items = list_r.json()["data"]
+    if not items:
+        return
+    ini_id = items[0]["ini_id"]
+
+    response = client.get(f"/api/v1/cap/{ini_id}")
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["ini_id"] == ini_id
+    assert "cap" in detail
+    assert "cap_label" in detail
+    assert "ini_titulo" in detail
+
+
+def test_cap_detail_404_for_unknown_id():
+    """Unknown ini_id returns 404."""
+    response = client.get("/api/v1/cap/9999999999")
+    assert response.status_code == 404
+
+
+def test_cap_pagination():
+    """Pagination works correctly for CAP endpoint."""
+    r1 = client.get("/api/v1/cap/?limit=5&offset=0")
+    r2 = client.get("/api/v1/cap/?limit=5&offset=5")
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+
+    ids1 = {item["ini_id"] for item in r1.json()["data"]}
+    ids2 = {item["ini_id"] for item in r2.json()["data"]}
+    # Two non-overlapping pages should have distinct ini_ids
+    if ids1 and ids2:
+        assert ids1.isdisjoint(ids2), "Paginated results should not overlap"

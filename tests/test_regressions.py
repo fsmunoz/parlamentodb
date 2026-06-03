@@ -532,3 +532,70 @@ def test_atividades_by_tipo_in_stats():
     # VOT should be majority (>= 280 out of 307)
     assert tipo_counts["VOT"] >= 280, \
         f"VOT should be dominant type, got {tipo_counts['VOT']} out of 307"
+
+
+# ─── CAP regression tests ────────────────────────────────────────────────────
+
+# Valid CAP major-topic codes (Comparative Agendas Project codebook)
+_VALID_CAP_CODES = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 999}
+
+
+def test_cap_all_codes_valid():
+    """
+    REGRESSION: Every returned cap code must be a valid CAP major-topic code.
+
+    The valid codes are 1-10, 12-21, 23, 999 (no 11, 22).  The classifier should
+    never emit a code outside this set.
+    """
+    response = client.get("/api/v1/cap/?legislatura=L17&limit=500")
+    assert response.status_code == 200
+    data = response.json()
+    for item in data["data"]:
+        assert item["cap"] in _VALID_CAP_CODES, (
+            f"ini_id={item['ini_id']} has invalid CAP code {item['cap']}"
+        )
+
+
+def test_cap_labels_non_empty():
+    """
+    REGRESSION: Every returned cap_label must be a non-empty string.
+
+    A None or empty label would indicate a mapping error in the classifier.
+    """
+    response = client.get("/api/v1/cap/?legislatura=L17&limit=500")
+    assert response.status_code == 200
+    data = response.json()
+    for item in data["data"]:
+        assert item["cap_label"], (
+            f"ini_id={item['ini_id']} has empty/null cap_label"
+        )
+
+
+def test_cap_l17_row_count_reasonable():
+    """
+    REGRESSION: L17 classified count must be ≤ total L17 iniciativas (929).
+
+    We start with ~20% coverage (≈ 176 classified), growing toward 929 as
+    fetch_data.py --frac 1.0 is run.  The count must never exceed 929.
+    """
+    response = client.get("/api/v1/cap/?legislatura=L17&limit=1")
+    assert response.status_code == 200
+    total = response.json()["pagination"]["total"]
+    assert total <= 929, (
+        f"L17 classified count {total} exceeds total L17 iniciativas (929)"
+    )
+
+
+def test_cap_ini_id_is_string():
+    """
+    REGRESSION: ini_id must always be a string, not an integer.
+
+    The API spec uses ini_id as a string throughout; a regression to int
+    would break JOIN behaviour and client contract.
+    """
+    response = client.get("/api/v1/cap/?limit=20")
+    assert response.status_code == 200
+    for item in response.json()["data"]:
+        assert isinstance(item["ini_id"], str), (
+            f"ini_id should be str, got {type(item['ini_id'])}"
+        )

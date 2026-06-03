@@ -95,6 +95,15 @@ def get_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
                 SELECT * FROM read_parquet('{data_dir}/atividades_votacoes_*.parquet')
             """)
 
+        # CAP classification mapping (optional - present only if classify.py has been run
+        # and data/cap_source/cap_<leg>.csv imported via ETL)
+        cap_files = list(data_dir.glob("cap_l*.parquet"))
+        if cap_files:
+            conn.execute(f"""
+                CREATE VIEW cap AS
+                SELECT * FROM read_parquet('{data_dir}/cap_l*.parquet')
+            """)
+
         yield conn
 
     finally:
