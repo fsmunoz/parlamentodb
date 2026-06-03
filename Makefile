@@ -5,7 +5,7 @@
 # Frederico Muñoz <fsmunoz@gmail.com>
 #
 
-.PHONY: help test test-unit test-integration test-property test-contract test-coverage test-quick test-all test-parallel test-endpoint test-clean install dev-install run etl-fetch etl-transform etl-all clean lint format
+.PHONY: help test test-unit test-integration test-property test-contract test-coverage test-quick test-all test-parallel test-endpoint test-clean install dev-install run etl-fetch etl-transform etl-all etl-cap-transform clean lint format
 
 # Default target
 .DEFAULT_GOAL := help
@@ -43,6 +43,7 @@ help:
 	@echo "  make etl-fetch         - Fetch JSON from parlamento.pt"
 	@echo "  make etl-transform     - Transform JSON to Parquet"
 	@echo "  make etl-all           - Run full ETL pipeline"
+	@echo "  make etl-cap-transform - Regenerate CAP Parquet from committed cap_l17.csv (L17 only)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean             - Clean all artifacts"
@@ -172,6 +173,13 @@ etl-transform-latest:
 
 etl-latest: etl-fetch-latest etl-transform-latest
 	@echo "==> ETL pipeline complete (L17 only)"
+
+etl-cap-transform:
+	@echo "==> Transforming CAP mapping (L17 only)..."
+	. .venv/bin/activate && python -m etl.transform -l L17 \
+		--skip-info-base --skip-votacoes --skip-deputados \
+		--skip-circulos --skip-partidos \
+		--skip-atividades --skip-atividades-votacoes
 
 # Parameterized ETL targets (usage: make etl-fetch-leg LEG=L17)
 etl-fetch-leg:
