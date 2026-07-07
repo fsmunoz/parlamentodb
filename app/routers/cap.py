@@ -78,11 +78,13 @@ def list_cap(
     numeric CAP code, its Portuguese label, and basic initiative metadata.
 
     **CAP major-topic codes** (22 categories, from comparativeagendas.net):
-    1=Macroeconomia, 2=Direitos Civis, 3=Saúde, 4=Agricultura, 5=Trabalho,
-    6=Educação, 7=Ambiente, 8=Energia, 9=Imigração, 10=Transportes,
-    12=Direito e Crime, 13=Protecção Social, 14=Habitação, 15=Banca e Comércio,
-    16=Defesa, 17=Tecnologia, 18=Comércio Externo, 19=Assuntos Internacionais,
-    20=Administração Pública, 21=Terras Públicas, 23=Cultura, 999=Sem conteúdo político
+    1=Macroeconomia, 2=Direitos civis e liberdades, 3=Saúde, 4=Agricultura,
+    5=Trabalho e Emprego, 6=Educação, 7=Ambiente, 8=Energia, 9=Imigração,
+    10=Transportes, 12=Justiça e Crime, 13=Segurança Social, 14=Habitação,
+    15=Sistema bancário, assuntos financeiros e comércio interno, 16=Defesa,
+    17=Tecnologia, 18=Comércio internacional, 19=Relações externas,
+    20=Governo e Administração Pública, 21=Território e Recursos naturais,
+    23=Cultura, desporto e lazer, 999=Sem conteúdo político
 
     Not all initiatives are classified (only those for which a full-text document
     could be downloaded).  Coverage grows as the pipeline is run with --frac 1.0.

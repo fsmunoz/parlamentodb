@@ -539,6 +539,33 @@ def test_atividades_by_tipo_in_stats():
 # Valid CAP major-topic codes (Comparative Agendas Project codebook)
 _VALID_CAP_CODES = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 999}
 
+# Canonical Portuguese labels for CAP codes (must match CAP_LABELS in
+# votoaberto-cap's classify.py, where the mapping CSV is produced)
+_CAP_PT_LABELS = {
+    1: "Macroeconomia",
+    2: "Direitos civis e liberdades",
+    3: "Saúde",
+    4: "Agricultura",
+    5: "Trabalho e Emprego",
+    6: "Educação",
+    7: "Ambiente",
+    8: "Energia",
+    9: "Imigração",
+    10: "Transportes",
+    12: "Justiça e Crime",
+    13: "Segurança Social",
+    14: "Habitação",
+    15: "Sistema bancário, assuntos financeiros e comércio interno",
+    16: "Defesa",
+    17: "Tecnologia",
+    18: "Comércio internacional",
+    19: "Relações externas",
+    20: "Governo e Administração Pública",
+    21: "Território e Recursos naturais",
+    23: "Cultura, desporto e lazer",
+    999: "Sem conteúdo político",
+}
+
 
 def test_cap_all_codes_valid():
     """
@@ -568,6 +595,24 @@ def test_cap_labels_non_empty():
     for item in data["data"]:
         assert item["cap_label"], (
             f"ini_id={item['ini_id']} has empty/null cap_label"
+        )
+
+
+def test_cap_labels_match_canonical():
+    """
+    REGRESSION: Every (cap, cap_label) pair must match the canonical PT labels.
+
+    Labels were corrected on 2026-07-07 (e.g., 13 was 'Protecção Social', now
+    'Segurança Social').  A mismatch here means a stale cap_source CSV was
+    copied in from votoaberto-cap without the fixed CAP_LABELS mapping.
+    """
+    response = client.get("/api/v1/cap/?legislatura=L17&limit=500")
+    assert response.status_code == 200
+    for item in response.json()["data"]:
+        expected = _CAP_PT_LABELS.get(item["cap"])
+        assert item["cap_label"] == expected, (
+            f"ini_id={item['ini_id']} cap={item['cap']}: "
+            f"label {item['cap_label']!r} != canonical {expected!r}"
         )
 
 
