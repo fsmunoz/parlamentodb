@@ -1649,3 +1649,358 @@ ini_id,legislatura,cap,cap_label,model_version
 315033,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
 315032,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
 315031,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357038,L17,6,Educação,xlm-roberta-large-pooled-cap-v3
+357037,L17,19,Relações externas,xlm-roberta-large-pooled-cap-v3
+357036,L17,6,Educação,xlm-roberta-large-pooled-cap-v3
+357035,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+357034,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+357033,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+357032,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+357031,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+357030,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+357029,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+357028,L17,23,"Cultura, desporto e lazer",xlm-roberta-large-pooled-cap-v3
+357027,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+357026,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+357025,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357024,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+357023,L17,19,Relações externas,xlm-roberta-large-pooled-cap-v3
+357022,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+357021,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+357020,L17,21,Território e Recursos naturais,xlm-roberta-large-pooled-cap-v3
+357019,L17,18,Comércio internacional,xlm-roberta-large-pooled-cap-v3
+357018,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+357017,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357016,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357015,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357014,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357013,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+357012,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357011,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+357010,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+357009,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+357008,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+357007,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+357006,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+357005,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+357004,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+357003,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+357002,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+357001,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+357000,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356999,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356998,L17,21,Território e Recursos naturais,xlm-roberta-large-pooled-cap-v3
+356997,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356996,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+356995,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356994,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356993,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356992,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356991,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356990,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356989,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356988,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356987,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356986,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356985,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356984,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+356983,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356982,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356981,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356980,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+356979,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356978,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356977,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356976,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356975,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356974,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356973,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356972,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356971,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356970,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356969,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356968,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356967,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356966,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356965,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356964,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356963,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356962,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356961,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+356960,L17,19,Relações externas,xlm-roberta-large-pooled-cap-v3
+356959,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356958,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356957,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356956,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356955,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356954,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+356953,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356952,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356951,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356950,L17,23,"Cultura, desporto e lazer",xlm-roberta-large-pooled-cap-v3
+356949,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356948,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356947,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356946,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356945,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+356944,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356943,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356942,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356941,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+356940,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356939,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356938,L17,8,Energia,xlm-roberta-large-pooled-cap-v3
+356937,L17,19,Relações externas,xlm-roberta-large-pooled-cap-v3
+356936,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356935,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356934,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356933,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+356932,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356931,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356930,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356929,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356928,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356927,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356925,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356924,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+356923,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+356922,L17,6,Educação,xlm-roberta-large-pooled-cap-v3
+356921,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356920,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356919,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356918,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356917,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356916,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356915,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356914,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356913,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356912,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356911,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356910,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356909,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356908,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356907,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356906,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356905,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356904,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356903,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356902,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356901,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356900,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356899,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356898,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356896,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356895,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356894,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356893,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356892,L17,6,Educação,xlm-roberta-large-pooled-cap-v3
+356891,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356890,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+356889,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356888,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356887,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+356886,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356885,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356884,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+356883,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356882,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356881,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356880,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356879,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356878,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356877,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356876,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356875,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356874,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356873,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356872,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356871,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356870,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356869,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+356868,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356867,L17,6,Educação,xlm-roberta-large-pooled-cap-v3
+356866,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356865,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356864,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+356863,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+356862,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356861,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356860,L17,8,Energia,xlm-roberta-large-pooled-cap-v3
+356859,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356858,L17,19,Relações externas,xlm-roberta-large-pooled-cap-v3
+356817,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356808,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356803,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356750,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+356711,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356703,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356700,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356680,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356664,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356654,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356639,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356637,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356635,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356634,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356633,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356630,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356621,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356620,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356619,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356616,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356615,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356601,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356599,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356597,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356596,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356595,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+356590,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356586,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356585,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356583,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356573,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356565,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356564,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+356543,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+356515,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356472,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+356457,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356451,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356442,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+356412,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356401,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+356368,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+356364,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356363,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356356,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+356345,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356338,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356337,L17,16,Defesa,xlm-roberta-large-pooled-cap-v3
+356327,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356326,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356324,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+356292,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+356278,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356272,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+356236,L17,16,Defesa,xlm-roberta-large-pooled-cap-v3
+356212,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356204,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356200,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356199,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356195,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+356163,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356149,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356135,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356134,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356133,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356132,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356128,L17,23,"Cultura, desporto e lazer",xlm-roberta-large-pooled-cap-v3
+356117,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356116,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356115,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356114,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356104,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+356081,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+356058,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+346039,L17,23,"Cultura, desporto e lazer",xlm-roberta-large-pooled-cap-v3
+346036,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+346034,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+346025,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+346024,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+346007,L17,8,Energia,xlm-roberta-large-pooled-cap-v3
+345996,L17,8,Energia,xlm-roberta-large-pooled-cap-v3
+345992,L17,8,Energia,xlm-roberta-large-pooled-cap-v3
+345991,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+345977,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+345974,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+345973,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+345972,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+345971,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+335953,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+335944,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+335943,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+335932,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+335931,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+335929,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+335927,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+315908,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+315888,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315877,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+315871,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315866,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+315851,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315823,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315797,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+315787,L17,21,Território e Recursos naturais,xlm-roberta-large-pooled-cap-v3
+315774,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315771,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+315764,L17,19,Relações externas,xlm-roberta-large-pooled-cap-v3
+315763,L17,1,Macroeconomia,xlm-roberta-large-pooled-cap-v3
+315760,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315758,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+315748,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315728,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+315727,L17,21,Território e Recursos naturais,xlm-roberta-large-pooled-cap-v3
+315726,L17,21,Território e Recursos naturais,xlm-roberta-large-pooled-cap-v3
+315680,L17,23,"Cultura, desporto e lazer",xlm-roberta-large-pooled-cap-v3
+315669,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+315658,L17,14,Habitação,xlm-roberta-large-pooled-cap-v3
+315656,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315655,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315654,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315653,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315652,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315651,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315650,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315639,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315638,L17,4,Agricultura,xlm-roberta-large-pooled-cap-v3
+315602,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315595,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+315594,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315580,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315568,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315566,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315562,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315513,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315504,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+315468,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+315458,L17,10,Transportes,xlm-roberta-large-pooled-cap-v3
+315445,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+315443,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315381,L17,15,"Sistema bancário, assuntos financeiros e comércio interno",xlm-roberta-large-pooled-cap-v3
+315378,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315375,L17,5,Trabalho e Emprego,xlm-roberta-large-pooled-cap-v3
+315371,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315347,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315326,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315307,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+315302,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315298,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315297,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315278,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315271,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315269,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315262,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315261,L17,17,Tecnologia,xlm-roberta-large-pooled-cap-v3
+315260,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315259,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315219,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+315213,L17,13,Segurança Social,xlm-roberta-large-pooled-cap-v3
+315166,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315163,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315162,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+315161,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+315160,L17,9,Imigração,xlm-roberta-large-pooled-cap-v3
+315117,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315104,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315095,L17,3,Saúde,xlm-roberta-large-pooled-cap-v3
+315090,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315072,L17,20,Governo e Administração Pública,xlm-roberta-large-pooled-cap-v3
+315071,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315070,L17,2,Direitos civis e liberdades,xlm-roberta-large-pooled-cap-v3
+315067,L17,8,Energia,xlm-roberta-large-pooled-cap-v3
+315066,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315047,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315043,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
+315040,L17,7,Ambiente,xlm-roberta-large-pooled-cap-v3
+315034,L17,12,Justiça e Crime,xlm-roberta-large-pooled-cap-v3
