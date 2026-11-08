@@ -149,3 +149,31 @@ def validate_pagination(limit: int, offset: int, max_limit: int = 500) -> tuple[
         )
 
     return limit, offset
+
+
+# Meeting types of a vote (votacoes.tipo_reuniao): plenary, Comissão Permanente, committee
+TIPOS_REUNIAO = ("RP", "CP", "COM")
+
+# Default for aggregations: plenary votes only (committee votes are a different population)
+PLENARIO = ["RP", "CP"]
+
+
+def validate_tipos_reuniao(value: Optional[str], default: Optional[list[str]] = None) -> Optional[list[str]]:
+    """
+    Parse comma-separated meeting types, case-insensitive (e.g. 'rp,com' → ['RP', 'COM']).
+
+    Returns default when value is empty.
+
+    Raises:
+        HTTPException: If any type is not one of TIPOS_REUNIAO
+    """
+    if not value:
+        return default
+
+    tipos = [t.strip().upper() for t in value.split(",") if t.strip()]
+    if not tipos or any(t not in TIPOS_REUNIAO for t in tipos):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid tipo_reuniao: '{value}'. Expected comma-separated values of {', '.join(TIPOS_REUNIAO)}"
+        )
+    return tipos

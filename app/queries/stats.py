@@ -17,7 +17,7 @@ it's implemented at the "silver" lever, and made available in a new
 import duckdb
 
 
-def get_initiatives_by_fase(conn: duckdb.DuckDBPyConnection, legislatura: str) -> list[tuple]:
+def get_initiatives_by_fase(conn: duckdb.DuckDBPyConnection, legislatura: str, tipos_reuniao: list[str]) -> list[tuple]:
     """
     Aggregation #1: Total initiatives + vote outcomes by Fase.
 
@@ -27,6 +27,7 @@ def get_initiatives_by_fase(conn: duckdb.DuckDBPyConnection, legislatura: str) -
     Args:
         conn: DuckDB connection
         legislatura: Legislature identifier (L15, L16, L17)
+        tipos_reuniao: Meeting types to include (e.g. validators.PLENARIO)
 
     Returns:
         List of tuples: (fase, resultado, vote_count, initiative_count)
@@ -39,15 +40,16 @@ def get_initiatives_by_fase(conn: duckdb.DuckDBPyConnection, legislatura: str) -
         COUNT(DISTINCT ini_id) as initiative_count
     FROM votacoes
     WHERE legislatura = $legislatura
+      AND tipo_reuniao = ANY($tipos_reuniao)
       AND fase IS NOT NULL
       AND resultado IS NOT NULL
     GROUP BY fase, resultado
     ORDER BY fase, resultado
     """
-    return conn.execute(query, {"legislatura": legislatura}).fetchall()
+    return conn.execute(query, {"legislatura": legislatura, "tipos_reuniao": tipos_reuniao}).fetchall()
 
 
-def get_initiatives_by_party(conn: duckdb.DuckDBPyConnection, legislatura: str) -> list[dict]:
+def get_initiatives_by_party(conn: duckdb.DuckDBPyConnection, legislatura: str, tipos_reuniao: list[str]) -> list[dict]:
     """
     Aggregation #2: Total initiatives by party + outcomes by Fase for each.
 
@@ -58,6 +60,7 @@ def get_initiatives_by_party(conn: duckdb.DuckDBPyConnection, legislatura: str) 
     Args:
         conn: DuckDB connection
         legislatura: Legislature identifier (L15, L16, L17)
+        tipos_reuniao: Meeting types to include (e.g. validators.PLENARIO)
 
     Returns:
         List of dicts with structure:
@@ -110,13 +113,14 @@ def get_initiatives_by_party(conn: duckdb.DuckDBPyConnection, legislatura: str) 
     FROM flattened_initiatives f
     JOIN votacoes v ON f.ini_id = v.ini_id
     WHERE v.legislatura = $legislatura
+      AND v.tipo_reuniao = ANY($tipos_reuniao)
       AND v.fase IS NOT NULL
       AND v.resultado IS NOT NULL
     GROUP BY f.party, v.fase, v.resultado
     ORDER BY f.party, v.fase, v.resultado
     """
 
-    fase_data = conn.execute(fase_breakdown_query, {"legislatura": legislatura}).fetchall()
+    fase_data = conn.execute(fase_breakdown_query, {"legislatura": legislatura, "tipos_reuniao": tipos_reuniao}).fetchall()
 
     # Organize data structure: party -> list of fase outcomes
     party_fase_map: dict[str, list[dict]] = {}
@@ -141,7 +145,7 @@ def get_initiatives_by_party(conn: duckdb.DuckDBPyConnection, legislatura: str) 
     return result
 
 
-def get_votes_by_event_type(conn: duckdb.DuckDBPyConnection, legislatura: str) -> list[tuple]:
+def get_votes_by_event_type(conn: duckdb.DuckDBPyConnection, legislatura: str, tipos_reuniao: list[str]) -> list[tuple]:
     """
     Aggregation #3: Total votes by Event type (fase).
 
@@ -150,6 +154,7 @@ def get_votes_by_event_type(conn: duckdb.DuckDBPyConnection, legislatura: str) -
     Args:
         conn: DuckDB connection
         legislatura: Legislature identifier (L15, L16, L17)
+        tipos_reuniao: Meeting types to include (e.g. validators.PLENARIO)
 
     Returns:
         List of tuples: (fase, vote_count)
@@ -160,14 +165,15 @@ def get_votes_by_event_type(conn: duckdb.DuckDBPyConnection, legislatura: str) -
         COUNT(*) as vote_count
     FROM votacoes
     WHERE legislatura = $legislatura
+      AND tipo_reuniao = ANY($tipos_reuniao)
       AND fase IS NOT NULL
     GROUP BY fase
     ORDER BY vote_count DESC
     """
-    return conn.execute(query, {"legislatura": legislatura}).fetchall()
+    return conn.execute(query, {"legislatura": legislatura, "tipos_reuniao": tipos_reuniao}).fetchall()
 
 
-def get_votes_by_party_and_type(conn: duckdb.DuckDBPyConnection, legislatura: str) -> list[tuple]:
+def get_votes_by_party_and_type(conn: duckdb.DuckDBPyConnection, legislatura: str, tipos_reuniao: list[str]) -> list[tuple]:
     """
     Aggregation #4: Total votes by party and vote type.
 
@@ -178,6 +184,7 @@ def get_votes_by_party_and_type(conn: duckdb.DuckDBPyConnection, legislatura: st
     Args:
         conn: DuckDB connection
         legislatura: Legislature identifier (L15, L16, L17)
+        tipos_reuniao: Meeting types to include (e.g. validators.PLENARIO)
 
     Returns:
         List of tuples: (party, vote_type, vote_count)
@@ -190,6 +197,7 @@ def get_votes_by_party_and_type(conn: duckdb.DuckDBPyConnection, legislatura: st
             'A Favor' as vote_type
         FROM votacoes
         WHERE legislatura = $legislatura
+          AND tipo_reuniao = ANY($tipos_reuniao)
           AND detalhe_parsed IS NOT NULL
           AND detalhe_parsed.a_favor IS NOT NULL
           AND length(detalhe_parsed.a_favor) > 0
@@ -200,6 +208,7 @@ def get_votes_by_party_and_type(conn: duckdb.DuckDBPyConnection, legislatura: st
             'Contra' as vote_type
         FROM votacoes
         WHERE legislatura = $legislatura
+          AND tipo_reuniao = ANY($tipos_reuniao)
           AND detalhe_parsed IS NOT NULL
           AND detalhe_parsed.contra IS NOT NULL
           AND length(detalhe_parsed.contra) > 0
@@ -210,6 +219,7 @@ def get_votes_by_party_and_type(conn: duckdb.DuckDBPyConnection, legislatura: st
             'Abstenção' as vote_type
         FROM votacoes
         WHERE legislatura = $legislatura
+          AND tipo_reuniao = ANY($tipos_reuniao)
           AND detalhe_parsed IS NOT NULL
           AND detalhe_parsed.abstencao IS NOT NULL
           AND length(detalhe_parsed.abstencao) > 0
@@ -223,4 +233,4 @@ def get_votes_by_party_and_type(conn: duckdb.DuckDBPyConnection, legislatura: st
     GROUP BY party, vote_type
     ORDER BY party, vote_type
     """
-    return conn.execute(query, {"legislatura": legislatura}).fetchall()
+    return conn.execute(query, {"legislatura": legislatura, "tipos_reuniao": tipos_reuniao}).fetchall()

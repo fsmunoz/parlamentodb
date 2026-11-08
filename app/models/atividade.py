@@ -73,6 +73,7 @@ class Atividade(BaseModel):
     votacao_debate: list[Any] | None = Field(None, description="Full vote array (nested structure)")
     publicacao: list[Any] | None = Field(None, description="Publication references")
     publicacao_debate: list[Any] | None = Field(None, description="Debate publication references")
+    textos_aprovados: list[str] | None = Field(None, description="IDs of approved texts")
 
     model_config = {
         "json_schema_extra": {
@@ -157,6 +158,7 @@ class AtividadeVotacao(BaseModel):
     detalhe_parsed: DetalheVotos | None = Field(None, description="Structured party voting breakdown")
     has_party_details: bool = Field(..., description="True if detalhe field is populated")
     source: str = Field(..., description="Always 'atividade' to distinguish from initiative votes")
+    publicacao: list[Any] | None = Field(None, description="DAR publication of the vote (URLDiario links)")
 
     model_config = {
         "json_schema_extra": {

@@ -10,6 +10,21 @@ from typing import Generator
 
 from app.config import settings
 
+# view name -> Parquet glob (relative to DATA_DIR)
+OPTIONAL_VIEWS = {
+    "info_base": "info_base_*.parquet",
+    "deputados": "deputados_*.parquet",
+    "circulos": "circulos_*.parquet",
+    "partidos": "partidos_*.parquet",
+    "atividades": "atividades_l*.parquet",
+    "atividades_votacoes": "atividades_votacoes_*.parquet",
+    "debates": "debates_*.parquet",
+    "audicoes": "audicoes_*.parquet",
+    "audiencias": "audiencias_*.parquet",
+    "cap": "cap_l*.parquet",
+}
+
+
 def get_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
     """
     Create DuckDB connection with Parquet files registered as views.
@@ -49,60 +64,15 @@ def get_db() -> Generator[duckdb.DuckDBPyConnection, None, None]:
             SELECT * FROM read_parquet('{data_dir}/votacoes_*.parquet')
         """)
 
-        # info_base might not exist for all legislatures (WIP)
-        info_base_files = list(data_dir.glob("info_base_*.parquet"))
-        if info_base_files:
-            conn.execute(f"""
-                CREATE VIEW info_base AS
-                SELECT * FROM read_parquet('{data_dir}/info_base_*.parquet')
-            """)
-
-        # deputados, circulos, partidos
-        deputados_files = list(data_dir.glob("deputados_*.parquet"))
-        if deputados_files:
-            conn.execute(f"""
-                CREATE VIEW deputados AS
-                SELECT * FROM read_parquet('{data_dir}/deputados_*.parquet')
-            """)
-
-        circulos_files = list(data_dir.glob("circulos_*.parquet"))
-        if circulos_files:
-            conn.execute(f"""
-                CREATE VIEW circulos AS
-                SELECT * FROM read_parquet('{data_dir}/circulos_*.parquet')
-            """)
-
-        partidos_files = list(data_dir.glob("partidos_*.parquet"))
-        if partidos_files:
-            conn.execute(f"""
-                CREATE VIEW partidos AS
-                SELECT * FROM read_parquet('{data_dir}/partidos_*.parquet')
-            """)
-
-        # atividades and atividades_votacoes
-        # Note: Use specific patterns to avoid schema mismatch between atividades and atividades_votacoes
-        atividades_files = list(data_dir.glob("atividades_l*.parquet"))
-        if atividades_files:
-            conn.execute(f"""
-                CREATE VIEW atividades AS
-                SELECT * FROM read_parquet('{data_dir}/atividades_l*.parquet')
-            """)
-
-        atividades_votacoes_files = list(data_dir.glob("atividades_votacoes_*.parquet"))
-        if atividades_votacoes_files:
-            conn.execute(f"""
-                CREATE VIEW atividades_votacoes AS
-                SELECT * FROM read_parquet('{data_dir}/atividades_votacoes_*.parquet')
-            """)
-
-        # CAP classification mapping (optional - present only if classify.py has been run
-        # and data/cap_source/cap_<leg>.csv imported via ETL)
-        cap_files = list(data_dir.glob("cap_l*.parquet"))
-        if cap_files:
-            conn.execute(f"""
-                CREATE VIEW cap AS
-                SELECT * FROM read_parquet('{data_dir}/cap_l*.parquet')
-            """)
+        # Optional views, created only when their files exist.
+        # Note: atividades_l* (not atividades_*) avoids matching atividades_votacoes files.
+        # cap is present only if classify.py has been run and imported via ETL.
+        for view, pattern in OPTIONAL_VIEWS.items():
+            if any(data_dir.glob(pattern)):
+                conn.execute(f"""
+                    CREATE VIEW {view} AS
+                    SELECT * FROM read_parquet('{data_dir}/{pattern}')
+                """)
 
         yield conn
 

@@ -162,7 +162,8 @@ def get_atividade(
                 observacoes,
                 votacao_debate,
                 publicacao,
-                publicacao_debate
+                publicacao_debate,
+                textos_aprovados
             FROM atividades
             WHERE ativ_id = $ativ_id
         """
@@ -188,7 +189,8 @@ def get_atividade(
             observacoes=result[12],
             votacao_debate=result[13],
             publicacao=result[14],
-            publicacao_debate=result[15]
+            publicacao_debate=result[15],
+            textos_aprovados=result[16]
         )
 
     except HTTPException:
@@ -343,7 +345,8 @@ def get_atividade_votacao(
                 detalhe,
                 detalhe_parsed,
                 has_party_details,
-                source
+                source,
+                publicacao
             FROM atividades_votacoes
             WHERE vot_id = $vot_id
         """
@@ -371,7 +374,8 @@ def get_atividade_votacao(
             detalhe=result[14],
             detalhe_parsed=result[15],
             has_party_details=result[16],
-            source=result[17]
+            source=result[17],
+            publicacao=result[18]
         )
 
     except HTTPException:

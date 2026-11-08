@@ -9,6 +9,7 @@ preserved as STRUCT/LIST types, so they can be used and filtered upon.
 
 import duckdb
 import structlog
+import unicodedata
 from pathlib import Path
 
 import config
@@ -71,7 +72,8 @@ def parse_detalhe(detalhe: str) -> dict:
         # Extract vote type (A Favor, Contra, etc.)
         vote_type, parties_html = section.split(':', 1)
         vote_type_key = vote_type.strip().lower().replace(' ', '_')
-        vote_type_key = vote_type_key.replace('ção', 'cao')  # normalize accents
+        # strip accents: "Abstenção" -> abstencao, "Ausência" -> ausencia
+        vote_type_key = unicodedata.normalize('NFKD', vote_type_key).encode('ascii', 'ignore').decode()
 
         # Remove HTML tags
         parties_str = re.sub(r'</?I>', '', parties_html)
@@ -283,7 +285,8 @@ def transform_votacoes(legislature: str, silver_path: Path | None = None) -> Pat
     """
     Transform votacoes by flattening nested structure from iniciativas.
 
-    Extracts all votes from iniciativas.ini_eventos.Votacao and creates
+    Extracts all votes from iniciativas.ini_eventos.Votacao (plenary) and
+    ini_eventos.Comissao.Votacao (committee, tipo_reuniao='COM') and creates
     a separate votacoes.parquet file with one record per vote.
 
     Args:
@@ -358,13 +361,50 @@ def transform_votacoes(legislature: str, silver_path: Path | None = None) -> Pat
                         ini_tipo,
                         evento.Fase as fase,
                         evento.DataFase as data_fase,
-                        UNNEST(evento.Votacao) as vot
+                        UNNEST(evento.Votacao) as vot,
+                        NULL::VARCHAR as comissao,
+                        NULL::VARCHAR as tipo_reuniao_override
                     FROM all_events
                     WHERE evento.Votacao IS NOT NULL
                       AND length(evento.Votacao) > 0
+                ),
+                -- Committee votes live one level deeper (IniEventos[].Comissao[].Votacao)
+                -- and have no tipoReuniao in the source, so tag them 'COM'.
+                event_comissoes AS (
+                    SELECT
+                        ini_id, ini_nr, legislatura, ini_titulo, ini_tipo,
+                        evento.Fase as fase,
+                        evento.DataFase as data_fase,
+                        UNNEST(evento.Comissao) as com
+                    FROM all_events
+                    WHERE evento.Comissao IS NOT NULL
+                      AND length(evento.Comissao) > 0
+                ),
+                committee_votes AS (
+                    SELECT
+                        ini_id, ini_nr, legislatura, ini_titulo, ini_tipo, fase, data_fase,
+                        UNNEST(com.Votacao) as vot,
+                        trim(com.Nome) as comissao,
+                        'COM' as tipo_reuniao_override
+                    FROM event_comissoes
+                    WHERE com.Votacao IS NOT NULL
+                      AND length(com.Votacao) > 0
+                ),
+                all_votes AS (
+                    SELECT ini_id, ini_nr, legislatura, ini_titulo, ini_tipo, fase, data_fase,
+                           vot.id, vot.data, vot.resultado, vot.descricao, vot.reuniao,
+                           vot.tipoReuniao::VARCHAR as tipoReuniao, vot.unanime, vot.ausencias, vot.detalhe,
+                           comissao, tipo_reuniao_override
+                    FROM flattened_votes
+                    UNION ALL
+                    SELECT ini_id, ini_nr, legislatura, ini_titulo, ini_tipo, fase, data_fase,
+                           vot.id, vot.data, vot.resultado, vot.descricao, vot.reuniao,
+                           NULL::VARCHAR, vot.unanime, vot.ausencias, vot.detalhe,
+                           comissao, tipo_reuniao_override
+                    FROM committee_votes
                 )
                 SELECT
-                    vot.id as vot_id,
+                    id as vot_id,
                     ini_id,
                     ini_nr,
                     legislatura,
@@ -372,17 +412,18 @@ def transform_votacoes(legislature: str, silver_path: Path | None = None) -> Pat
                     ini_tipo,
                     fase,
                     data_fase,
-                    vot.data as data,
-                    vot.resultado,
-                    vot.descricao,
-                    vot.reuniao,
-                    vot.tipoReuniao as tipo_reuniao,
-                    vot.unanime,
-                    vot.ausencias,
-                    vot.detalhe,
-                    parse_detalhe(vot.detalhe) as detalhe_parsed,
-                    length(COALESCE(vot.detalhe, '')) >= 1000 as is_nominal
-                FROM flattened_votes
+                    data,
+                    resultado,
+                    descricao,
+                    reuniao,
+                    COALESCE(tipo_reuniao_override, tipoReuniao) as tipo_reuniao,
+                    comissao,
+                    unanime,
+                    ausencias,
+                    detalhe,
+                    parse_detalhe(detalhe) as detalhe_parsed,
+                    length(COALESCE(detalhe, '')) >= 1000 as is_nominal
+                FROM all_votes
                 ORDER BY data DESC NULLS LAST, vot_id
             ) TO '{silver_path}' (
                 FORMAT PARQUET,
@@ -769,6 +810,7 @@ def transform_atividades(
                     ativ.Publicacao as publicacao,
                     ativ.PublicacaoDebate as publicacao_debate,
                     ativ.VotacaoDebate as votacao_debate,
+                    ativ.TextosAprovados::VARCHAR[] as textos_aprovados,
                     ativ.Observacoes as observacoes,
                     '{legislature}' as legislatura,
                     CURRENT_TIMESTAMP as etl_timestamp
@@ -895,6 +937,7 @@ def transform_atividades_votacoes(
                     vot.unanime,
                     vot.ausencias,
                     vot.detalhe,
+                    vot.publicacao,
                     parse_detalhe(vot.detalhe) as detalhe_parsed,
                     CASE
                         WHEN vot.detalhe IS NOT NULL AND length(vot.detalhe) > 0
@@ -935,6 +978,88 @@ def transform_atividades_votacoes(
     except Exception as e:
         logger.error("transform_error", legislature=legislature, error=str(e))
         raise TransformError(f"Error transforming atividades_votacoes for {legislature}: {e}")
+
+
+def _audicao_select(id_field: str, numero_field: str, extra: str = "") -> str:
+    """SELECT list shared by Audicoes and Audiencias (same shape, different key names)."""
+    return f"""
+        CAST(x.{id_field} AS VARCHAR) as aud_id,
+        x.{numero_field}::VARCHAR as numero,
+        -- numero is '<n>-<committee acronym>-<legislature>', e.g. '74-CECT-XVII'
+        split_part(x.{numero_field}, '-', 2) as comissao_sigla,
+        x.Assunto::VARCHAR as assunto,
+        x.Entidades::VARCHAR as entidades,
+        x.Data::DATE as data,
+        x.SessaoLegislativa::VARCHAR as sessao{extra}
+    """
+
+
+# Top-level sections of the Atividades JSON persisted as their own tables:
+# name (silver file prefix) -> (JSON section, SELECT list over `x`).
+# Explicit casts keep schemas identical across legislatures (all-null fields infer as JSON).
+ATIVIDADES_SECTIONS = {
+    "debates": ("Debates", """
+        x.DebateId::VARCHAR as debate_id,
+        x.TipoDebate::VARCHAR as tipo_debate,
+        x.TipoDebateDesig::VARCHAR as tipo_debate_desig,
+        x.Assunto::VARCHAR as assunto,
+        x.DataDebate::DATE as data_debate,
+        x.DataEntrada::DATE as data_entrada,
+        x.TipoAutor::VARCHAR as tipo_autor,
+        x.AutoresGP::VARCHAR as autor_gp,
+        x.AutoresDeputados::VARCHAR as autores_deputados,
+        x.Artigo::VARCHAR as artigo,
+        x.Intervencoes::VARCHAR[] as intervencoes,
+        x.Publicacao as publicacao,
+        x.Sessao::VARCHAR as sessao,
+        x.Observacoes::VARCHAR as observacoes
+    """),
+    "audicoes": ("Audicoes", _audicao_select("IDAudicao", "NumeroAudicao")),
+    "audiencias": ("Audiencias", _audicao_select("IDAudiencia", "NumeroAudiencia",
+                                                 ",\n        x.Concedida::VARCHAR as concedida")),
+}
+
+
+def transform_atividades_section(legislature: str, name: str) -> Path | None:
+    """
+    Persist one top-level section of the Atividades JSON (see ATIVIDADES_SECTIONS).
+
+    Returns:
+        Path to created Parquet file, or None if bronze file doesn't exist
+    """
+    section, select_list = ATIVIDADES_SECTIONS[name]
+    bronze_path = config.BRONZE_DIR / f"atividades_{legislature.lower()}.json"
+    silver_path = config.SILVER_DIR / f"{name}_{legislature.lower()}.parquet"
+
+    if not bronze_path.exists():
+        logger.warning("bronze_file_not_found", path=str(bronze_path))
+        return None
+
+    try:
+        conn = duckdb.connect()
+        conn.execute(f"SET memory_limit='{config.DUCKDB_MEMORY_LIMIT}'")
+        conn.execute(f"SET threads={config.DUCKDB_THREADS}")
+        conn.execute(f"""
+            COPY (
+                WITH items AS (
+                    SELECT UNNEST({section}) as x
+                    FROM read_json_auto('{bronze_path}', maximum_object_size=16777216)
+                )
+                SELECT {select_list}, '{legislature}' as legislatura
+                FROM items
+            ) TO '{silver_path}' (
+                FORMAT PARQUET,
+                COMPRESSION '{config.PARQUET_COMPRESSION}',
+                ROW_GROUP_SIZE {config.PARQUET_ROW_GROUP_SIZE}
+            )
+        """)
+        count = conn.execute(f"SELECT count(*) FROM '{silver_path}'").fetchone()[0]
+        logger.info("transform_atividades_section_complete", legislature=legislature, section=name, rows=count)
+        return silver_path
+
+    except duckdb.Error as e:
+        logger.error("duckdb_error", legislature=legislature, section=name, error=str(e))
+        raise TransformError(f"Error transforming {name} for {legislature}: {e}")
 
 
 def transform_cap(
@@ -1119,6 +1244,14 @@ def transform_all(
                     leg_results["atividades"] = atividades_path
             except TransformError as e:
                 logger.error("transform_atividades_failed", legislature=leg, error=str(e))
+
+            for name in ATIVIDADES_SECTIONS:
+                try:
+                    path = transform_atividades_section(leg, name)
+                    if path:
+                        leg_results[name] = path
+                except TransformError as e:
+                    logger.error("transform_atividades_section_failed", legislature=leg, section=name, error=str(e))
 
         # Transform atividades_votacoes (requires atividades to exist)
         if include_atividades_votacoes and "atividades" in leg_results:

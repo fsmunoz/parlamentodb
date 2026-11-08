@@ -13,7 +13,7 @@ from app.models.deputado import DeputadoListItem
 from app.models.iniciativa import IniciativaListItem
 from app.models.partidos import PartyVoteSupportResponse, PartyVoteSupportData, FaseVoteSupport, PartyVoteCount
 from app.models.common import APIResponse, PaginationMeta, APIMeta
-from app.models.validators import validate_legislatura, validate_pagination
+from app.models.validators import validate_legislatura, validate_pagination, validate_tipos_reuniao, PLENARIO
 from app.queries.utils import QueryBuilder
 from app.queries.partidos import get_party_vote_support
 
@@ -330,6 +330,7 @@ def get_partido_iniciativas(
 def get_partido_vote_support(
     gp_sigla: str,
     legislatura: str = Query(..., description="Legislature (required)"),
+    tipo_reuniao: str | None = Query(None, description="Meeting types to include, comma-separated: RP (plenary), CP (Comissão Permanente), COM (committee). Default: RP,CP (plenary only)."),
     db: duckdb.DuckDBPyConnection = Depends(get_db)
 ):
     """
@@ -347,6 +348,7 @@ def get_partido_vote_support(
     try:
         # Validate inputs
         legislatura = validate_legislatura(legislatura)
+        tipos_reuniao = validate_tipos_reuniao(tipo_reuniao, PLENARIO)
 
         # Verify party exists
         party_query = """
@@ -362,7 +364,7 @@ def get_partido_vote_support(
             )
 
         # Get vote support data
-        rows = get_party_vote_support(db, gp_sigla, legislatura)
+        rows = get_party_vote_support(db, gp_sigla, legislatura, tipos_reuniao)
 
         # Transform query results into response structure
         # Query returns: (fase, party, a_favor_count, contra_count, abstencao_count)

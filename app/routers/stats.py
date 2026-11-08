@@ -30,7 +30,7 @@ from app.models.stats import (
     VoteSourceBreakdown,
 )
 from app.models.common import APIMeta
-from app.models.validators import validate_legislatura
+from app.models.validators import validate_legislatura, validate_tipos_reuniao, PLENARIO
 from app.queries.stats import (
     get_initiatives_by_fase,
     get_initiatives_by_party,
@@ -45,6 +45,7 @@ logger = structlog.get_logger()
 @router.get("/", response_model=StatsResponse)
 def get_legislature_stats(
     legislatura: str = Query(..., description="Legislature identifier (L15, L16, L17)"),
+    tipo_reuniao: str | None = Query(None, description="Meeting types to include, comma-separated: RP (plenary), CP (Comissão Permanente), COM (committee). Default: RP,CP (plenary only)."),
     db: duckdb.DuckDBPyConnection = Depends(get_db)
 ):
     """
@@ -87,12 +88,13 @@ def get_legislature_stats(
     try:
         # Validate input
         legislatura = validate_legislatura(legislatura)
+        tipos_reuniao = validate_tipos_reuniao(tipo_reuniao, PLENARIO)
 
         logger.info("stats_query_started", legislatura=legislatura)
 
         # Execute all 4 aggregations
         # Aggregation #1: Initiatives by fase outcome
-        agg1_results = get_initiatives_by_fase(db, legislatura)
+        agg1_results = get_initiatives_by_fase(db, legislatura, tipos_reuniao)
         initiatives_by_fase = [
             FaseOutcome(
                 fase=row[0],
@@ -104,7 +106,7 @@ def get_legislature_stats(
         ]
 
         # Aggregation #2: Initiatives by party with fase outcomes
-        agg2_results = get_initiatives_by_party(db, legislatura)
+        agg2_results = get_initiatives_by_party(db, legislatura, tipos_reuniao)
         initiatives_by_party = [
             PartyInitiativeStats(
                 party=party_data["party"],
@@ -122,7 +124,7 @@ def get_legislature_stats(
         ]
 
         # Aggregation #3: Votes by event type
-        agg3_results = get_votes_by_event_type(db, legislatura)
+        agg3_results = get_votes_by_event_type(db, legislatura, tipos_reuniao)
         votes_by_event_type = [
             VotesByEventType(
                 fase=row[0],
@@ -132,7 +134,7 @@ def get_legislature_stats(
         ]
 
         # Aggregation #4: Votes by party and type
-        agg4_results = get_votes_by_party_and_type(db, legislatura)
+        agg4_results = get_votes_by_party_and_type(db, legislatura, tipos_reuniao)
         votes_by_party_and_type = [
             PartyVoteTypeStats(
                 party=row[0],
@@ -185,10 +187,12 @@ def get_legislature_stats(
         try:
             agg7_query = """
                 SELECT
-                    (SELECT COUNT(*) FROM votacoes WHERE legislatura = $legislatura) as iniciativas,
+                    (SELECT COUNT(*) FROM votacoes WHERE legislatura = $legislatura AND tipo_reuniao = ANY($tipos_reuniao)) as iniciativas,
                     (SELECT COALESCE(COUNT(*), 0) FROM atividades_votacoes WHERE legislatura = $legislatura) as atividades
             """
-            agg7_result = db.execute(agg7_query, {"legislatura": legislatura}).fetchone()
+            agg7_result = db.execute(
+                agg7_query, {"legislatura": legislatura, "tipos_reuniao": tipos_reuniao}
+            ).fetchone()
             if agg7_result:
                 iniciativas_count = agg7_result[0]
                 atividades_count = agg7_result[1]

@@ -55,6 +55,7 @@ class Votacao(BaseModel):
     """Vote record from a parliamentary session."""
 
     vot_id: str = Field(..., description="Unique vote ID")
+    ini_id: str | None = Field(None, description="Initiative ID (links to /iniciativas/{ini_id})")
     ini_nr: str = Field(..., description="Initiative number")
     legislatura: str = Field(..., description="Legislature (L15, L16, L17)")
     ini_titulo: str = Field(..., description="Initiative title")
@@ -65,7 +66,8 @@ class Votacao(BaseModel):
     resultado: str | None = Field(None, description="Vote result (Aprovado, Rejeitado, etc.)")
     descricao: str | None = Field(None, description="Vote description")
     reuniao: str | None = Field(None, description="Meeting number")
-    tipo_reuniao: str | None = Field(None, description="Meeting type")
+    tipo_reuniao: str | None = Field(None, description="Meeting type: RP (plenary), CP (Comissão Permanente), COM (committee)")
+    comissao: str | None = Field(None, description="Committee name (committee votes only)")
     unanime: str | None = Field(None, description="Unanimous vote flag")
     ausencias: list[str] | None = Field(None, description="Absent parties/members")
     detalhe: str | None = Field(None, description="HTML-formatted voting details (original)")
@@ -99,12 +101,15 @@ class VotacaoListItem(BaseModel):
     """Simplified vote record for list responses."""
 
     vot_id: str
+    ini_id: str | None = None
     ini_nr: str
     legislatura: str
     ini_titulo: str
     fase: str | None
     data: date | None
     resultado: str | None
+    tipo_reuniao: str | None = None
+    comissao: str | None = None
 
     model_config = {
         "json_schema_extra": {

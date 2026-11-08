@@ -8,7 +8,9 @@ Query functions for party-specific statistics and aggregations.
 import duckdb
 
 
-def get_party_vote_support(conn: duckdb.DuckDBPyConnection, gp_sigla: str, legislatura: str) -> list[tuple]:
+def get_party_vote_support(
+    conn: duckdb.DuckDBPyConnection, gp_sigla: str, legislatura: str, tipos_reuniao: list[str]
+) -> list[tuple]:
     """
     Get aggregated vote counts by parties on initiatives authored by a specific party.
 
@@ -19,6 +21,7 @@ def get_party_vote_support(conn: duckdb.DuckDBPyConnection, gp_sigla: str, legis
         conn: DuckDB connection
         gp_sigla: Parliamentary group abbreviation (focus party whose initiatives are analyzed)
         legislatura: Legislature identifier (L15, L16, L17)
+        tipos_reuniao: Meeting types to include (e.g. validators.PLENARIO)
 
     Returns:
         List of tuples: (fase, party, a_favor_count, contra_count, abstencao_count)
@@ -42,6 +45,7 @@ def get_party_vote_support(conn: duckdb.DuckDBPyConnection, gp_sigla: str, legis
         FROM votacoes v
         JOIN party_initiatives pi ON v.ini_id = pi.ini_id
         WHERE v.legislatura = $legislatura
+          AND v.tipo_reuniao = ANY($tipos_reuniao)
           AND v.fase IS NOT NULL
           AND v.detalhe_parsed IS NOT NULL
     ),
@@ -83,4 +87,6 @@ def get_party_vote_support(conn: duckdb.DuckDBPyConnection, gp_sigla: str, legis
     GROUP BY fase, party
     ORDER BY fase, party
     """
-    return conn.execute(query, {"gp_sigla": gp_sigla.upper(), "legislatura": legislatura}).fetchall()
+    return conn.execute(
+        query, {"gp_sigla": gp_sigla.upper(), "legislatura": legislatura, "tipos_reuniao": tipos_reuniao}
+    ).fetchall()

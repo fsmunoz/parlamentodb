@@ -618,16 +618,16 @@ def test_cap_labels_match_canonical():
 
 def test_cap_l17_row_count_reasonable():
     """
-    REGRESSION: L17 classified count must be ≤ total L17 iniciativas (929).
+    REGRESSION: L17 classified count must be ≤ total L17 iniciativas.
 
-    We start with ~20% coverage (≈ 176 classified), growing toward 929 as
-    fetch_data.py --frac 1.0 is run.  The count must never exceed 929.
+    Compared against the live count, since L17 keeps growing with each fetch.
     """
     response = client.get("/api/v1/cap/?legislatura=L17&limit=1")
     assert response.status_code == 200
     total = response.json()["pagination"]["total"]
-    assert total <= 929, (
-        f"L17 classified count {total} exceeds total L17 iniciativas (929)"
+    n_ini = client.get("/api/v1/iniciativas/?legislatura=L17&limit=1").json()["pagination"]["total"]
+    assert total <= n_ini, (
+        f"L17 classified count {total} exceeds total L17 iniciativas ({n_ini})"
     )
 
 
@@ -644,3 +644,86 @@ def test_cap_ini_id_is_string():
         assert isinstance(item["ini_id"], str), (
             f"ini_id should be str, got {type(item['ini_id'])}"
         )
+
+
+def test_parse_detalhe_keeps_ausencia():
+    """
+    REGRESSION: "Ausência" header was dropped because only 'ção' was de-accented.
+    """
+    from etl.transform import parse_detalhe
+
+    parsed = parse_detalhe("A Favor: <I>PSD</I>, <I> CH</I><BR>Abstenção: <I>PS</I><BR>Ausência: <I>IL</I>, <I> L</I>")
+    assert parsed == {"a_favor": ["PSD", "CH"], "contra": [], "abstencao": ["PS"], "ausencia": ["IL", "L"]}
+
+
+def test_committee_votes_extracted():
+    """
+    REGRESSION: votes under IniEventos[].Comissao[].Votacao were not extracted.
+    They must be listed with tipo_reuniao='COM' and the committee name.
+    """
+    response = client.get("/api/v1/iniciativas/votacoes/?tipo_reuniao=COM&limit=20")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["pagination"]["total"] > 0
+    for vote in body["data"]:
+        assert vote["tipo_reuniao"] == "COM"
+        assert vote["comissao"]
+
+    plenary = client.get("/api/v1/iniciativas/votacoes/?tipo_reuniao=RP&limit=5").json()
+    assert all(v["tipo_reuniao"] == "RP" and v["comissao"] is None for v in plenary["data"])
+
+
+@pytest.mark.parametrize("path,key", [
+    ("/api/v1/debates/", "debate_id"),
+    ("/api/v1/audicoes/", "aud_id"),
+    ("/api/v1/audiencias/", "aud_id"),
+])
+def test_atividades_sections_list_and_get(path, key):
+    """Debates/audições/audiências: list is non-empty and every item round-trips via its detail route."""
+    body = client.get(f"{path}?legislatura=L17&limit=3").json()
+    assert body["pagination"]["total"] > 0
+    for item in body["data"]:
+        assert item["legislatura"] == "L17"
+        detail = client.get(f"{path}{item[key]}")
+        assert detail.status_code == 200 and detail.json()[key] == item[key]
+    assert client.get(f"{path}does-not-exist").status_code == 404
+
+
+def test_audicoes_comissao_filter_case_insensitive():
+    """comissao filter matches the acronym parsed from numero, ignoring case."""
+    item = client.get("/api/v1/audicoes/?limit=1").json()["data"][0]
+    body = client.get(f"/api/v1/audicoes/?comissao={item['comissao_sigla'].lower()}&limit=20").json()
+    assert body["pagination"]["total"] > 0
+    assert all(i["comissao_sigla"] == item["comissao_sigla"] for i in body["data"])
+
+
+def test_iniciativa_comissoes():
+    """Committee work for an initiative that has committee votes is listed; unknown id is 404."""
+    ini_id = client.get("/api/v1/iniciativas/votacoes/?tipo_reuniao=COM&limit=1").json()["data"][0]["ini_id"]
+    body = client.get(f"/api/v1/iniciativas/{ini_id}/comissoes").json()
+    assert body["pagination"]["total"] > 0
+    assert all(c["ini_id"] == ini_id and c["comissao"] for c in body["data"])
+    assert client.get("/api/v1/iniciativas/does-not-exist/comissoes").status_code == 404
+
+
+def test_aggregations_default_to_plenary_votes():
+    """
+    REGRESSION: /stats and vote-support count plenary votes (RP, CP) by default;
+    committee votes (COM) only when asked for via tipo_reuniao.
+    """
+    def n_votes(tipos):
+        return client.get(f"/api/v1/iniciativas/votacoes/?legislatura=L17&tipo_reuniao={tipos}&limit=1").json()["pagination"]["total"]
+
+    def stats_votes(qs=""):
+        return client.get(f"/api/v1/stats/?legislatura=L17{qs}").json()["data"]["vote_source_breakdown"]["iniciativas"]
+
+    assert stats_votes() == n_votes("RP,CP")
+    assert stats_votes("&tipo_reuniao=rp,cp,com") == n_votes("RP,CP,COM") > n_votes("RP,CP")
+
+    support = client.get("/api/v1/partidos/PS/vote-support?legislatura=L17")
+    assert support.status_code == 200
+    assert support.json() != client.get("/api/v1/partidos/PS/vote-support?legislatura=L17&tipo_reuniao=RP,CP,COM").json()
+
+    for path in ["/api/v1/stats/?legislatura=L17", "/api/v1/partidos/PS/vote-support?legislatura=L17",
+                 "/api/v1/iniciativas/votacoes/?"]:
+        assert client.get(f"{path}&tipo_reuniao=XX").status_code == 400

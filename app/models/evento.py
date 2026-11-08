@@ -68,3 +68,26 @@ class EventoListItem(BaseModel):
             }]
         }
     }
+
+
+class EventoComissao(BaseModel):
+    """
+    Committee handling of an initiative at one event (flattened IniEventos[].Comissao[]).
+
+    Committee votes are not repeated here: use /iniciativas/votacoes/?ini_id=...&tipo_reuniao=COM.
+    """
+
+    ini_id: str = Field(..., description="Initiative ID")
+    evt_id: str | None = Field(None, description="Event ID")
+    fase: str | None = Field(None, description="Event phase (e.g. 'Baixa comissão especialidade')")
+    data_fase: date | None = Field(None, description="Event date")
+    id_comissao: str | None = Field(None, description="Committee ID")
+    comissao: str | None = Field(None, description="Committee name")
+    competente: str | None = Field(None, description="'S' if this is the lead committee")
+    data_distribuicao: date | None = Field(None, description="Date the initiative was assigned to the committee")
+    relatores: list[Any] | None = Field(None, description="Rapporteurs (nome, gp, dates)")
+    pedidos_parecer: list[Any] | None = Field(None, description="Opinions requested from external entities")
+    pareceres_recebidos: list[Any] | None = Field(None, description="Opinions received from external entities")
+    audicoes: list[Any] | None = Field(None, description="Hearings (ids link to /audicoes)")
+    audiencias: list[Any] | None = Field(None, description="Audiences (ids link to /audiencias)")
+    documentos: list[Any] | None = Field(None, description="Committee documents (reports, opinions) with URLs")

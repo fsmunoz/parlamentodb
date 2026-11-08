@@ -14,10 +14,10 @@ import structlog
 from app.config import settings
 from app.dependencies import get_db
 from app.models.iniciativa import Iniciativa, IniciativaListItem
-from app.models.evento import EventoListItem
+from app.models.evento import EventoListItem, EventoComissao
 from app.models.common import APIResponse, PaginationMeta, APIMeta
 from app.models.validators import validate_legislatura, validate_partido, validate_pagination
-from app.queries.utils import QueryBuilder
+from app.queries.utils import QueryBuilder, fetch_models
 
 router = APIRouter(prefix="/api/v1/iniciativas", tags=["iniciativas"])
 logger = structlog.get_logger()
@@ -399,3 +399,46 @@ def list_eventos(
             status_code=500,
             detail="Internal server error retrieving initiative events"
         )
+
+
+@router.get("/{ini_id}/comissoes", response_model=APIResponse[EventoComissao])
+def list_comissoes(ini_id: str, db: duckdb.DuckDBPyConnection = Depends(get_db)):
+    """
+    List the committee work on an initiative: one entry per committee per event, with
+    rapporteurs, opinions requested/received, hearings and documents.
+    """
+    if not db.execute("SELECT 1 FROM iniciativas WHERE ini_id = $ini_id", {"ini_id": ini_id}).fetchone():
+        raise HTTPException(status_code=404, detail=f"Initiative with ini_id={ini_id} not found")
+
+    data = fetch_models(db, """
+        WITH eventos AS (
+            SELECT ini_id, UNNEST(ini_eventos) as e
+            FROM iniciativas
+            WHERE ini_id = $ini_id AND ini_eventos IS NOT NULL
+        ),
+        comissoes AS (
+            SELECT ini_id, e.EvtId as evt_id, e.Fase as fase, e.DataFase as data_fase, UNNEST(e.Comissao) as c
+            FROM eventos
+            WHERE e.Comissao IS NOT NULL
+        )
+        SELECT
+            ini_id, evt_id, fase, data_fase,
+            c.IdComissao as id_comissao,
+            trim(c.Nome) as comissao,
+            c.Competente as competente,
+            c.DataDistribuicao as data_distribuicao,
+            c.Relatores as relatores,
+            c.PedidosParecer as pedidos_parecer,
+            c.PareceresRecebidos as pareceres_recebidos,
+            c.Audicoes as audicoes,
+            c.Audiencias as audiencias,
+            c.Documentos as documentos
+        FROM comissoes
+        ORDER BY data_fase ASC NULLS LAST
+    """, {"ini_id": ini_id}, EventoComissao)
+
+    return APIResponse(
+        data=data,
+        pagination=PaginationMeta(limit=len(data), offset=0, total=len(data)),
+        meta=APIMeta(version=settings.API_VERSION)
+    )

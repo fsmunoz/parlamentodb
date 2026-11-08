@@ -15,7 +15,7 @@ from app.config import settings
 from app.dependencies import get_db
 from app.models.votacao import Votacao, VotacaoListItem
 from app.models.common import APIResponse, PaginationMeta, APIMeta
-from app.models.validators import validate_legislatura, validate_partido, validate_pagination
+from app.models.validators import validate_legislatura, validate_partido, validate_pagination, validate_tipos_reuniao
 from app.queries.utils import QueryBuilder
 
 router = APIRouter(prefix="/api/v1/iniciativas/votacoes", tags=["votacoes"])
@@ -27,6 +27,7 @@ def list_votacoes(
     legislatura: str | None = Query(None, description="Filter by legislature (L15, L16, L17)"),
     ini_id: str | None = Query(None, description="Filter by initiative ID"),
     resultado: str | None = Query(None, description="Filter by result (Aprovado, Rejeitado, etc.)"),
+    tipo_reuniao: str | None = Query(None, description="Filter by meeting type, comma-separated: RP (plenary), CP (Comissão Permanente), COM (committee). Default: all."),
     q: str | None = Query(None, description="Search in initiative title (ini_titulo). Case-insensitive substring match."),
     data_desde: date | None = Query(None, description="Minimum vote date (YYYY-MM-DD)"),
     data_ate: date | None = Query(None, description="Maximum vote date (YYYY-MM-DD)"),
@@ -44,6 +45,7 @@ def list_votacoes(
     - Legislature (L15, L16, L17)
     - Initiative ID
     - Vote result
+    - Meeting type (plenary RP vs committee COM)
     - Date range
     - Party positions (in favor, against, abstaining)
 
@@ -71,6 +73,7 @@ def list_votacoes(
         qb.add_equals("legislatura", legislatura)
         qb.add_equals("ini_id", ini_id)
         qb.add_equals("resultado", resultado)
+        qb.add_in("tipo_reuniao", validate_tipos_reuniao(tipo_reuniao))
         qb.add_gte("data", data_desde, "data_desde")
         qb.add_lte("data", data_ate, "data_ate")
         qb.add_list_contains("detalhe_parsed.a_favor", partido_favor, "partido_favor")
@@ -89,12 +92,15 @@ def list_votacoes(
         data_query = f"""
             SELECT
                 vot_id,
+                ini_id,
                 ini_nr,
                 legislatura,
                 ini_titulo,
                 fase,
                 data,
-                resultado
+                resultado,
+                tipo_reuniao,
+                comissao
             FROM votacoes
             {where_sql}
             ORDER BY data DESC NULLS LAST, vot_id DESC
@@ -108,12 +114,15 @@ def list_votacoes(
         data = [
             VotacaoListItem(
                 vot_id=row[0],
-                ini_nr=row[1],
-                legislatura=row[2],
-                ini_titulo=row[3],
-                fase=row[4],
-                data=row[5],
-                resultado=row[6]
+                ini_id=row[1],
+                ini_nr=row[2],
+                legislatura=row[3],
+                ini_titulo=row[4],
+                fase=row[5],
+                data=row[6],
+                resultado=row[7],
+                tipo_reuniao=row[8],
+                comissao=row[9]
             )
             for row in rows
         ]
