@@ -8,6 +8,7 @@ preserved as STRUCT/LIST types, so they can be used and filtered upon.
 """
 
 import duckdb
+import re
 import structlog
 import unicodedata
 from pathlib import Path
@@ -23,93 +24,132 @@ class TransformError(Exception):
     pass
 
 
-def parse_detalhe(detalhe: str) -> dict:
-    """Parse HTML voting details into structured dict.
+# Vote positions ("sentidos") as they appear in detalhe, normalized to keys
+SENTIDOS = ('a_favor', 'contra', 'abstencao', 'ausencia')
 
-    Converts free-form HTML text like:
-        "A Favor: <I>PSD</I>, <I>CDS-PP</I><BR>Contra:<I>CH</I>"
+# "6-PSD": 6 deputies of PSD voted this way
+COUNT_RE = re.compile(r'^(\d+)-(.+)$')
 
-    Into structured dict:
-        {
-            "a_favor": ["PSD", "CDS-PP"],
-            "contra": ["CH"],
-            "abstencao": [],
-            "ausencia": []
-        }
+# "João Silva (PSD)": a deputy named individually (typically voting differently from the group)
+NAMED_RE = re.compile(r'^(.+?)\s*\(([^()]+)\)$')
+
+
+def _detalhe_tokens(detalhe: str):
+    """
+    Yield (sentido, token) for every entry in an HTML voting details string.
+
+    "A Favor: <I>PSD</I>, <I> 1-PS</I><BR>Contra:<I>CH</I>"
+    -> ('a_favor', 'PSD'), ('a_favor', '1-PS'), ('contra', 'CH')
+
+    This is based on the proc-parl-pt code, with some simplifications.
+    """
+    for section in detalhe.split('<BR>'):
+        if ':' not in section:
+            continue
+        vote_type, parties_html = section.split(':', 1)
+        # "Abstenção" -> abstencao, "Ausência" -> ausencia
+        sentido = unicodedata.normalize('NFKD', vote_type.strip().lower().replace(' ', '_'))
+        sentido = sentido.encode('ascii', 'ignore').decode()
+        if sentido not in SENTIDOS:
+            continue
+        for token in re.sub(r'</?I>', '', parties_html).split(','):
+            if token.strip():
+                yield sentido, token.strip()
+
+
+def parse_detalhe(detalhe: str) -> dict | None:
+    """Parse HTML voting details into party positions.
+
+    "A Favor: <I>PSD</I>, <I>CDS-PP</I><BR>Contra:<I>CH</I>"
+    -> {"a_favor": ["PSD", "CDS-PP"], "contra": ["CH"], "abstencao": [], "ausencia": []}
+
+    Only plain party codes are listed. Counts ("6-PSD") and individually named deputies
+    ("João Silva (PSD)") are left out here; see parse_detalhe_contagens and
+    parse_detalhe_deputados.
 
     IMPORTANT: Ninsc members are preserved with full names (e.g., "John Doe (Ninsc)") because they
     represent different political positions and must not be aggregated: a Ninsc MP can be a person
     that was elected by a party alone (only >1 MPs constitute a parliamentary group) or an MP that
     left the party that elected them. Either way, they should be treated as "parties" in themselves.
 
-    Args:
-        detalhe: HTML-formatted voting details string
-
     Returns:
         Dict with vote positions, or None if detalhe is empty
-
     """
-    if not detalhe or len(detalhe.strip()) == 0:
+    if not detalhe or not detalhe.strip():
         return None
 
-    import re
-
-    # Split by <BR> and process each section. This is based on the proc-parl-pt code, with some
-    # simplifications
-    
-    sections = detalhe.split('<BR>')
-    result = {
-        'a_favor': [],
-        'contra': [],
-        'abstencao': [],
-        'ausencia': []
-    }
-
-    for section in sections:
-        if ':' not in section:
+    result = {sentido: [] for sentido in SENTIDOS}
+    for sentido, token in _detalhe_tokens(detalhe):
+        if COUNT_RE.match(token) or token.isdigit():
             continue
-
-        # Extract vote type (A Favor, Contra, etc.)
-        vote_type, parties_html = section.split(':', 1)
-        vote_type_key = vote_type.strip().lower().replace(' ', '_')
-        # strip accents: "Abstenção" -> abstencao, "Ausência" -> ausencia
-        vote_type_key = unicodedata.normalize('NFKD', vote_type_key).encode('ascii', 'ignore').decode()
-
-        # Remove HTML tags
-        parties_str = re.sub(r'</?I>', '', parties_html)
-
-        # Split by comma
-        party_list = [p.strip() for p in parties_str.split(',')]
-
-        # Filter logic:
-        # - Keep: Party codes (PS, PSD, etc.) and Ninsc members with full names
-        # - Skip: Aggregates (6-PSD), individual party-affiliated MPs, empty strings
-        clean_parties = []
-        for p in party_list:
-            if not p:
-                continue
-            # Skip aggregates like "6-PSD"
-            if re.match(r'^\d+-', p):
-                continue
-            # CRITICAL: Keep Ninsc members with full names (e.g., "António Maló (Ninsc)")
-            # They represent different political positions and must not be aggregated
-            if '(Ninsc)' in p:
-                clean_parties.append(p)
-                continue
-            # Skip individual party-affiliated MPs like "João Silva (PSD)"
-            # (aggregate them to party level)
-            if re.match(r'.+\(.+\)$', p):
-                continue
-            # Skip numeric-only
-            if re.match(r'^\d+$', p):
-                continue
-            clean_parties.append(p)
-
-        # Map to result dict
-        if vote_type_key in result:
-            result[vote_type_key] = clean_parties
-
+        if '(Ninsc)' in token or not NAMED_RE.match(token):
+            result[sentido].append(token)
     return result
+
+
+def parse_detalhe_contagens(detalhe: str) -> list[dict] | None:
+    """
+    Per-party vote counts given in the source as "N-PARTY".
+
+    "A Favor: <I>82-PSD</I>, <I> 53-PS</I><BR>Abstenção:<I>3-PCP</I>"
+    -> [{"partido": "PSD", "sentido": "a_favor", "votos": 82}, ..., {"partido": "PCP", "sentido": "abstencao", "votos": 3}]
+
+    When a party is also listed by plain code, the count is the part of the group that voted
+    differently ("Contra: PSD, 1-PS" with PS under A Favor). When a vote lists every party only
+    as counts, these are the full per-party results.
+    """
+    if not detalhe or not detalhe.strip():
+        return None
+    return [
+        {'partido': m[2], 'sentido': sentido, 'votos': int(m[1])}
+        for sentido, token in _detalhe_tokens(detalhe)
+        if (m := COUNT_RE.match(token))
+    ]
+
+
+def parse_detalhe_deputados(detalhe: str) -> list[dict] | None:
+    """
+    Deputies named individually in the source, with their vote; Ninsc members are excluded
+    (they are already in parse_detalhe, as "parties").
+
+    "A Favor: <I>PS</I><BR>Contra:<I>21-PSD</I>, <I> João Silva (PSD)</I>"
+    -> [{"nome": "João Silva", "partido": "PSD", "sentido": "contra"}]
+    """
+    if not detalhe or not detalhe.strip():
+        return None
+    return [
+        {'nome': m[1], 'partido': m[2], 'sentido': sentido}
+        for sentido, token in _detalhe_tokens(detalhe)
+        if (m := NAMED_RE.match(token)) and m[2] != 'Ninsc'
+    ]
+
+
+_VARCHAR = duckdb.string_type()
+
+# UDF name -> (function, DuckDB return type)
+DETALHE_UDFS = {
+    "parse_detalhe": (
+        parse_detalhe,
+        duckdb.struct_type({sentido: duckdb.list_type(_VARCHAR) for sentido in SENTIDOS}),
+    ),
+    "parse_detalhe_contagens": (
+        parse_detalhe_contagens,
+        duckdb.list_type(duckdb.struct_type({'partido': _VARCHAR, 'sentido': _VARCHAR, 'votos': duckdb.sqltype('INTEGER')})),
+    ),
+    "parse_detalhe_deputados": (
+        parse_detalhe_deputados,
+        duckdb.list_type(duckdb.struct_type({'nome': _VARCHAR, 'partido': _VARCHAR, 'sentido': _VARCHAR})),
+    ),
+}
+
+
+def register_detalhe_udfs(conn: duckdb.DuckDBPyConnection) -> None:
+    """
+    Register the detalhe parsers as DuckDB UDFs (Python dicts become STRUCTs). Doing this in
+    Python rather than SQL reuses the proc_parl_pt logic and keeps it readable.
+    """
+    for name, (function, return_type) in DETALHE_UDFS.items():
+        conn.create_function(name, function, parameters=[_VARCHAR], return_type=return_type)
 
 
 def transform_legislature(
@@ -321,21 +361,7 @@ def transform_votacoes(legislature: str, silver_path: Path | None = None) -> Pat
         conn.execute(f"SET memory_limit='{config.DUCKDB_MEMORY_LIMIT}'")
         conn.execute(f"SET threads={config.DUCKDB_THREADS}")
 
-        # Register parse_detalhe UDF for parsing voting details Using native Python UDF, DuckDB will
-        # convert dict to STRUCT. This is likely possible in SQL, but doing it with a UDF allows me
-        # to reuse the existing code from proc_parl_pt, and it's more natural (check the SQL that
-        # flattens things just after this one...)
-        conn.create_function(
-            "parse_detalhe",
-            parse_detalhe,
-            parameters=[duckdb.string_type()],
-            return_type=duckdb.struct_type({
-                'a_favor': duckdb.list_type(duckdb.string_type()),
-                'contra': duckdb.list_type(duckdb.string_type()),
-                'abstencao': duckdb.list_type(duckdb.string_type()),
-                'ausencia': duckdb.list_type(duckdb.string_type())
-            })
-        )
+        register_detalhe_udfs(conn)
 
         # Flatten votacoes from nested structure
         query = f"""
@@ -422,6 +448,8 @@ def transform_votacoes(legislature: str, silver_path: Path | None = None) -> Pat
                     ausencias,
                     detalhe,
                     parse_detalhe(detalhe) as detalhe_parsed,
+                    parse_detalhe_contagens(detalhe) as detalhe_contagens,
+                    parse_detalhe_deputados(detalhe) as detalhe_deputados,
                     length(COALESCE(detalhe, '')) >= 1000 as is_nominal
                 FROM all_votes
                 ORDER BY data DESC NULLS LAST, vot_id
@@ -891,18 +919,7 @@ def transform_atividades_votacoes(
         conn.execute(f"SET memory_limit='{config.DUCKDB_MEMORY_LIMIT}'")
         conn.execute(f"SET threads={config.DUCKDB_THREADS}")
 
-        # Register parse_detalhe UDF (reuse from votacoes)
-        conn.create_function(
-            "parse_detalhe",
-            parse_detalhe,
-            parameters=[duckdb.string_type()],
-            return_type=duckdb.struct_type({
-                'a_favor': duckdb.list_type(duckdb.string_type()),
-                'contra': duckdb.list_type(duckdb.string_type()),
-                'abstencao': duckdb.list_type(duckdb.string_type()),
-                'ausencia': duckdb.list_type(duckdb.string_type())
-            })
-        )
+        register_detalhe_udfs(conn)
 
         # Flatten votes from atividades
         query = f"""
@@ -939,6 +956,8 @@ def transform_atividades_votacoes(
                     vot.detalhe,
                     vot.publicacao,
                     parse_detalhe(vot.detalhe) as detalhe_parsed,
+                    parse_detalhe_contagens(vot.detalhe) as detalhe_contagens,
+                    parse_detalhe_deputados(vot.detalhe) as detalhe_deputados,
                     CASE
                         WHEN vot.detalhe IS NOT NULL AND length(vot.detalhe) > 0
                         THEN true

@@ -51,6 +51,31 @@ class DetalheVotos(BaseModel):
     }
 
 
+class ContagemVoto(BaseModel):
+    """Vote count for part (or all) of a party, from "N-PARTY" in detalhe."""
+
+    partido: str = Field(..., description="Party code")
+    sentido: str = Field(..., description="a_favor, contra, abstencao or ausencia")
+    votos: int = Field(..., description="Number of deputies of the party voting this way")
+
+
+class DeputadoVoto(BaseModel):
+    """Deputy named individually in detalhe (typically voting differently from the group)."""
+
+    nome: str = Field(..., description="Deputy name")
+    partido: str = Field(..., description="Party code")
+    sentido: str = Field(..., description="a_favor, contra, abstencao or ausencia")
+
+
+VOTE_DETAIL_DOCS = {
+    "detalhe_contagens": (
+        "Per-party counts given in the source as 'N-PARTY'. If the party is also in detalhe_parsed, "
+        "this is the part of the group that voted differently; if it is not, it is the party's full result."
+    ),
+    "detalhe_deputados": "Deputies named individually in the source, with their vote (Ninsc excluded: they are in detalhe_parsed)",
+}
+
+
 class Votacao(BaseModel):
     """Vote record from a parliamentary session."""
 
@@ -72,6 +97,8 @@ class Votacao(BaseModel):
     ausencias: list[str] | None = Field(None, description="Absent parties/members")
     detalhe: str | None = Field(None, description="HTML-formatted voting details (original)")
     detalhe_parsed: DetalheVotos | None = Field(None, description="Structured voting details by party/member")
+    detalhe_contagens: list[ContagemVoto] | None = Field(None, description=VOTE_DETAIL_DOCS["detalhe_contagens"])
+    detalhe_deputados: list[DeputadoVoto] | None = Field(None, description=VOTE_DETAIL_DOCS["detalhe_deputados"])
     is_nominal: bool | None = Field(None, description="True if vote includes individual MP names (nominal vote)")
 
     model_config = {

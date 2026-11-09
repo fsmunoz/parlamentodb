@@ -346,7 +346,9 @@ def get_atividade_votacao(
                 detalhe_parsed,
                 has_party_details,
                 source,
-                publicacao
+                publicacao,
+                detalhe_contagens,
+                detalhe_deputados
             FROM atividades_votacoes
             WHERE vot_id = $vot_id
         """
@@ -375,7 +377,9 @@ def get_atividade_votacao(
             detalhe_parsed=result[15],
             has_party_details=result[16],
             source=result[17],
-            publicacao=result[18]
+            publicacao=result[18],
+            detalhe_contagens=result[19],
+            detalhe_deputados=result[20]
         )
 
     except HTTPException:

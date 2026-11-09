@@ -727,3 +727,33 @@ def test_aggregations_default_to_plenary_votes():
     for path in ["/api/v1/stats/?legislatura=L17", "/api/v1/partidos/PS/vote-support?legislatura=L17",
                  "/api/v1/iniciativas/votacoes/?"]:
         assert client.get(f"{path}&tipo_reuniao=XX").status_code == 400
+
+
+def test_parse_detalhe_counts_and_named_deputies():
+    """
+    REGRESSION: "N-PARTY" counts and named deputies were silently dropped by parse_detalhe.
+    They are kept in parse_detalhe_contagens / parse_detalhe_deputados; parse_detalhe is unchanged.
+    """
+    from etl.transform import parse_detalhe, parse_detalhe_contagens, parse_detalhe_deputados
+
+    d = ("A Favor: <I>CH</I>, <I> PS</I><BR>Contra:<I>PSD</I>, <I> 1-PS</I>, <I> 1-CDS-PP</I>, "
+         "<I> João Silva (PSD)</I>, <I> Ana Maló (Ninsc)</I><BR>Abstenção:<I>3-PCP</I>")
+    assert parse_detalhe(d) == {"a_favor": ["CH", "PS"], "contra": ["PSD", "Ana Maló (Ninsc)"], "abstencao": [], "ausencia": []}
+    assert parse_detalhe_contagens(d) == [
+        {"partido": "PS", "sentido": "contra", "votos": 1},
+        {"partido": "CDS-PP", "sentido": "contra", "votos": 1},
+        {"partido": "PCP", "sentido": "abstencao", "votos": 3},
+    ]
+    assert parse_detalhe_deputados(d) == [{"nome": "João Silva", "partido": "PSD", "sentido": "contra"}]
+    assert parse_detalhe_contagens("") is None and parse_detalhe_deputados(None) is None
+
+
+def test_vote_detail_exposes_counts():
+    """Votes with "N-PARTY" in detalhe expose them as detalhe_contagens in the API."""
+    for vote in client.get("/api/v1/iniciativas/votacoes/?legislatura=L17&limit=500").json()["data"]:
+        detail = client.get(f"/api/v1/iniciativas/votacoes/{vote['vot_id']}").json()
+        if detail["detalhe_contagens"]:
+            assert all(c["votos"] > 0 and c["partido"] for c in detail["detalhe_contagens"])
+            assert "detalhe_deputados" in detail
+            return
+    pytest.fail("no L17 vote with detalhe_contagens in the first 500")

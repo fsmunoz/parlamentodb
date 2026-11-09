@@ -13,7 +13,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 # Reuse DetalheVotos from votacao
-from app.models.votacao import DetalheVotos
+from app.models.votacao import DetalheVotos, ContagemVoto, DeputadoVoto, VOTE_DETAIL_DOCS
 
 
 class AtividadeListItem(BaseModel):
@@ -156,6 +156,8 @@ class AtividadeVotacao(BaseModel):
     ausencias: list[str] | None = Field(None, description="Absent parties/members")
     detalhe: str | None = Field(None, description="Original HTML voting details")
     detalhe_parsed: DetalheVotos | None = Field(None, description="Structured party voting breakdown")
+    detalhe_contagens: list[ContagemVoto] | None = Field(None, description=VOTE_DETAIL_DOCS["detalhe_contagens"])
+    detalhe_deputados: list[DeputadoVoto] | None = Field(None, description=VOTE_DETAIL_DOCS["detalhe_deputados"])
     has_party_details: bool = Field(..., description="True if detalhe field is populated")
     source: str = Field(..., description="Always 'atividade' to distinguish from initiative votes")
     publicacao: list[Any] | None = Field(None, description="DAR publication of the vote (URLDiario links)")
