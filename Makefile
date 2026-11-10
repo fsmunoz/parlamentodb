@@ -43,7 +43,7 @@ help:
 	@echo "  make etl-fetch         - Fetch JSON from parlamento.pt"
 	@echo "  make etl-transform     - Transform JSON to Parquet"
 	@echo "  make etl-all           - Run full ETL pipeline"
-	@echo "  make etl-cap-transform - Regenerate CAP Parquet from committed cap_l17.csv (L17 only)"
+	@echo "  make etl-cap-transform - Regenerate CAP Parquet from committed data/cap_source/cap_<leg>.csv"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean             - Clean all artifacts"
@@ -175,8 +175,8 @@ etl-latest: etl-fetch-latest etl-transform-latest
 	@echo "==> ETL pipeline complete (L17 only)"
 
 etl-cap-transform:
-	@echo "==> Transforming CAP mapping (L17 only)..."
-	. .venv/bin/activate && python -m etl.transform -l L17 \
+	@echo "==> Transforming CAP mappings (all legislatures with a CSV)..."
+	. .venv/bin/activate && python -m etl.transform \
 		--skip-info-base --skip-votacoes --skip-deputados \
 		--skip-circulos --skip-partidos \
 		--skip-atividades --skip-atividades-votacoes
