@@ -1,0 +1,25 @@
+# Portuguese Parliament API (FastAPI + DuckDB/Parquet), api.votoaberto.org
+# The security floor (DynamicUser, sandbox, firewall, apps.slice) comes from
+# /etc/systemd/system/app-.service.d/10-floor.conf: see ~/src/formalhaut/README.md.
+# Install or update: sudo ~/src/formalhaut/install <this file>
+# Author: Frederico Muñoz <fsmunoz@gmail.com>
+
+[Unit]
+Description=Portuguese Parliament API (FastAPI + DuckDB/Parquet), api.votoaberto.org
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fsmunoz/src/parlamentodb
+BindReadOnlyPaths=/home/fsmunoz/src/parlamentodb
+# systemd reads this file as root before the sandbox starts.
+EnvironmentFile=/home/fsmunoz/src/parlamentodb/.env
+Environment=HOME=/tmp
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/home/fsmunoz/src/parlamentodb/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=on-failure
+RestartSec=5
+MemoryMax=1500M
+CPUQuota=100%
+
+[Install]
+WantedBy=multi-user.target

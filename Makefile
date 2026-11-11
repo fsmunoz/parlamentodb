@@ -5,7 +5,7 @@
 # Frederico Muñoz <fsmunoz@gmail.com>
 #
 
-.PHONY: help test test-unit test-integration test-property test-contract test-coverage test-quick test-all test-parallel test-endpoint test-clean install dev-install run etl-fetch etl-transform etl-all etl-cap-transform clean lint format
+.PHONY: help test test-unit test-integration test-property test-contract test-coverage test-quick test-all test-parallel test-endpoint test-clean install dev-install run etl-fetch etl-transform etl-all etl-cap-transform deploy clean lint format
 
 # Default target
 .DEFAULT_GOAL := help
@@ -44,6 +44,9 @@ help:
 	@echo "  make etl-transform     - Transform JSON to Parquet"
 	@echo "  make etl-all           - Run full ETL pipeline"
 	@echo "  make etl-cap-transform - Regenerate CAP Parquet from committed data/cap_source/cap_<leg>.csv"
+	@echo ""
+	@echo "Production (formalhaut):"
+	@echo "  make deploy            - Rebuild Parquet and restart the API and the portal"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean             - Clean all artifacts"
@@ -192,6 +195,16 @@ etl-transform-leg:
 	@echo "==> Transforming legislature $(LEG)..."
 	. .venv/bin/activate && python -m etl.transform -l $(LEG)
 
+
+# Production (formalhaut)
+# ==============================================================================
+# Update: git pull && make deploy. Rebuilds data/silver from the fetched JSON, then
+# restarts the system units that read it (app-portal-votoaberto too). Fetch new data
+# first with make etl-fetch-latest. votoaberto (Lisp) also reads data/silver: it is
+# restarted by its own deploy. Unit: deploy/app-parlamentodb.service.
+SYSTEMCTL ?= sudo systemctl
+deploy: etl-transform
+	$(SYSTEMCTL) restart app-parlamentodb app-portal-votoaberto
 
 # Cleanup targets
 # ==============================================================================
