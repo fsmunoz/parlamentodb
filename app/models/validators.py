@@ -36,8 +36,8 @@ from typing import Optional
 # Legislature format pattern (L followed by digits, typically L15, L16, L17)
 LEGISLATURE_PATTERN = re.compile(r'^L\d{1,3}$')
 
-# Party abbreviation pattern (2-10 uppercase letters/numbers, e.g., PS, PSD, CH)
-PARTY_PATTERN = re.compile(r'^[A-Z0-9]{2,10}$')
+# Party abbreviation pattern (1-10 uppercase letters/numbers/hyphens, e.g., L, PS, CDS-PP)
+PARTY_PATTERN = re.compile(r'^[A-Z0-9-]{1,10}$')
 
 # Known valid legislatures (can be extended as new data becomes available)
 VALID_LEGISLATURES = {'L15', 'L16', 'L17'}
@@ -100,7 +100,7 @@ def validate_partido(value: Optional[str]) -> Optional[str]:
     if not PARTY_PATTERN.match(value):
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid party abbreviation: '{value}'. Expected 2-10 uppercase letters/numbers (e.g., PS, PSD, CH)"
+            detail=f"Invalid party abbreviation: '{value}'. Expected 1-10 uppercase letters/numbers/hyphens (e.g., L, PS, CDS-PP)"
         )
 
     return value

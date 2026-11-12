@@ -291,10 +291,47 @@ def fetch_atividades(legislature: str, force: bool = False) -> Path | None:
             temp_path.unlink()
 
 
+@retry(
+    stop=stop_after_attempt(config.FETCH_RETRIES),
+    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY)
+)
+def fetch_oe(ano: int, force: bool = False) -> Path:
+    """
+    Fetch the Orçamento do Estado propostas de alteração JSON for one budget year
+    ({"PropostaDeAlteracao": [...]}) into bronze/oe_{ano}.json, with an atomic write.
+    """
+    output_path = config.BRONZE_DIR / f"oe_{ano}.json"
+    if output_path.exists() and not force:
+        logger.info("file_exists", path=str(output_path), ano=ano)
+        return output_path
+
+    temp_path = output_path.with_suffix(".json.tmp")
+    try:
+        with httpx.Client(timeout=config.FETCH_TIMEOUT) as client:
+            response = client.get(
+                config.OE[ano]["url"], headers={"User-Agent": config.USER_AGENT}, follow_redirects=True
+            )
+            response.raise_for_status()
+            data = response.json()
+            if not isinstance(data, dict) or "PropostaDeAlteracao" not in data:
+                raise FetchError(f"Expected {{'PropostaDeAlteracao': [...]}}, got {type(data)}")
+            temp_path.write_text(response.text, encoding="utf-8")
+            temp_path.rename(output_path)
+            logger.info("fetch_oe_complete", ano=ano, propostas=len(data["PropostaDeAlteracao"]))
+            return output_path
+    except Exception as e:
+        logger.error("fetch_oe_error", ano=ano, error=str(e))
+        raise FetchError(f"Error fetching OE {ano}: {e}")
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
 def fetch_all(
     legislatures: list[str] | None = None,
     include_info_base: bool = True,
     include_atividades: bool = True,
+    include_oe: bool = True,
     force: bool = False
 ) -> dict[str, dict[str, Path]]:
     """
@@ -339,6 +376,14 @@ def fetch_all(
                 leg_results["atividades"] = fetch_atividades(leg, force=force)
             except FetchError as e:
                 logger.error("fetch_atividades_failed", legislature=leg, error=str(e))
+
+        # Fetch the OE budgets debated in this legislature
+        if include_oe:
+            for ano in [a for a, oe in config.OE.items() if oe["legislatura"] == leg]:
+                try:
+                    leg_results[f"oe_{ano}"] = fetch_oe(ano, force=force)
+                except FetchError as e:
+                    logger.error("fetch_oe_failed", ano=ano, error=str(e))
 
         if leg_results:
             results[leg] = leg_results

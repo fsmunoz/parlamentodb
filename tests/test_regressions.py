@@ -677,6 +677,8 @@ def test_committee_votes_extracted():
     ("/api/v1/debates/", "debate_id"),
     ("/api/v1/audicoes/", "aud_id"),
     ("/api/v1/audiencias/", "aud_id"),
+    ("/api/v1/oe/propostas/", "prop_id"),
+    ("/api/v1/oe/votacoes/", "vot_id"),
 ])
 def test_atividades_sections_list_and_get(path, key):
     """Debates/audições/audiências: list is non-empty and every item round-trips via its detail route."""

@@ -182,7 +182,7 @@ etl-cap-transform:
 	. .venv/bin/activate && python -m etl.transform \
 		--skip-info-base --skip-votacoes --skip-deputados \
 		--skip-circulos --skip-partidos \
-		--skip-atividades --skip-atividades-votacoes
+		--skip-atividades --skip-atividades-votacoes --skip-oe
 
 # Parameterized ETL targets (usage: make etl-fetch-leg LEG=L17)
 etl-fetch-leg:

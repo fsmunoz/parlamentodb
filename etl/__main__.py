@@ -35,6 +35,11 @@ def parse_args():
         help="Skip fetching atividades (activities) files"
     )
     parser.add_argument(
+        "--skip-oe",
+        action="store_true",
+        help="Skip fetching Orçamento do Estado (propostas de alteração) files"
+    )
+    parser.add_argument(
         "--no-force",
         action="store_true",
         help="Don't re-download files that already exist"
@@ -70,6 +75,7 @@ def main():
         legislatures=legislatures,
         include_info_base=not args.skip_info_base,
         include_atividades=not args.skip_atividades,
+        include_oe=not args.skip_oe,
         force=not args.no_force
     )
 
