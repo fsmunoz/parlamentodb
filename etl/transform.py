@@ -1185,26 +1185,35 @@ OE_SENTIDOS = {'Favor': 'a_favor', 'Contra': 'contra', 'Abstenção': 'abstencao
 # Proponentes.GP_Partido truncates CDS-PP
 OE_GP_FIXES = {'CDS-P': 'CDS-PP'}
 
+# Vote Resultado -> the votacoes vocabulary (unanimity goes to `unanime`, as in votacoes; the source
+# value is kept in resultado_original). Values not listed pass through unchanged.
+OE_RESULTADOS = {
+    'Aprovado(a)': 'Aprovado', 'Aprovado(a) por Unanimidade': 'Aprovado', 'Aprovado(a) com Alterações': 'Aprovado',
+    'Rejeitado(a)': 'Rejeitado', 'Prejudicado(a)': 'Prejudicado',
+}
+
 _OE_DETALHE = f"STRUCT({', '.join(f'{s} VARCHAR[]' for s in SENTIDOS)})"
 
 OE_PROPOSTAS_COLUMNS = {
     'prop_id': 'VARCHAR', 'numero': 'VARCHAR', 'ano': 'INTEGER', 'legislatura': 'VARCHAR',
     'data': 'DATE', 'titulo': 'VARCHAR', 'temas': 'VARCHAR[]', 'tipo': 'VARCHAR', 'estado': 'VARCHAR',
     'incide': 'VARCHAR', 'autores_gp': 'VARCHAR[]',
-    'proponentes': 'STRUCT(nome VARCHAR, partido VARCHAR)[]',
+    'proponentes': 'STRUCT(nome VARCHAR, partido VARCHAR, dep_cad_id VARCHAR)[]',
     'numero_artigo_novo': 'VARCHAR',
     'artigos': 'STRUCT(artigo VARCHAR, titulo VARCHAR, texto VARCHAR, estado VARCHAR)[]',
+    'requerimentos': 'STRUCT(data DATE, titulo VARCHAR, observacoes VARCHAR, aprovado BOOLEAN, ficheiro VARCHAR)[]',
     'ficheiro': 'VARCHAR', 'n_votacoes': 'INTEGER',
 }
 
 OE_VOTACOES_COLUMNS = {
     'vot_id': 'VARCHAR', 'prop_id': 'VARCHAR', 'numero': 'VARCHAR', 'ano': 'INTEGER',
     'legislatura': 'VARCHAR', 'titulo': 'VARCHAR', 'tipo': 'VARCHAR', 'autores_gp': 'VARCHAR[]',
-    'data': 'DATE', 'resultado': 'VARCHAR', 'resultado_completo': 'VARCHAR', 'descricao': 'VARCHAR',
+    'data': 'DATE', 'resultado': 'VARCHAR', 'resultado_original': 'VARCHAR', 'resultado_completo': 'VARCHAR',
+    'descricao': 'VARCHAR',
     'subdescricao': 'VARCHAR', 'tipo_reuniao': 'VARCHAR', 'unanime': 'VARCHAR',
     'votos': 'STRUCT(nome VARCHAR, voto VARCHAR)[]',
     'detalhe_parsed': _OE_DETALHE,
-    'detalhe_deputados': 'STRUCT(nome VARCHAR, partido VARCHAR, sentido VARCHAR)[]',
+    'detalhe_deputados': 'STRUCT(nome VARCHAR, partido VARCHAR, sentido VARCHAR, dep_cad_id VARCHAR)[]',
     'source': 'VARCHAR',
 }
 
@@ -1223,14 +1232,26 @@ def _split(value: str | None, sep: str) -> list[str]:
     return [part.strip() for part in (value or '').split(sep) if part.strip()]
 
 
-def _oe_deputado(nome: str, data: date | None, deputados: dict) -> tuple[str, str | None]:
-    """Source deputy name ('SARA MADRUGA DA COSTA') -> (nome_parlamentar, gp_sigla on that date or None)."""
-    nome_parl, historico = deputados.get(nome.strip().lower(), (nome.strip().title(), []))
+def _oe_deputado(nome: str, data: date | None, deputados: dict, partido: str | None = None) -> tuple[str, str | None, str | None]:
+    """
+    Source deputy name ('SARA MADRUGA DA COSTA') -> (nome_parlamentar, gp_sigla on that date, dep_cad_id).
+
+    deputados: lower(nome_parlamentar) -> [(nome_parlamentar, dep_cad_id, [(gp_sigla, inicio, fim), ...]), ...]
+
+    Two deputies can share a name in a legislature (e.g. two 'Jorge Pinto' in L16): the party the
+    source gives picks one; if that doesn't settle it, the party and id are None (not guessed).
+    """
+    candidatos = deputados.get(nome.strip().lower(), [])
+    if len(candidatos) > 1 and partido:
+        candidatos = [c for c in candidatos if any(h[0] == partido for h in c[2])]
+    if len(candidatos) != 1:
+        return nome.strip().title(), None, None
+    nome_parl, dep_cad_id, historico = candidatos[0]
     sigla = next((
         sigla for sigla, inicio, fim in historico
         if data is not None and inicio <= data and (fim is None or data <= fim)
     ), None)
-    return nome_parl, sigla
+    return nome_parl, sigla, dep_cad_id
 
 
 def oe_autores(autores: list[str], proponentes: list[dict], data: date | None, siglas: dict, deputados: dict) -> list[str]:
@@ -1245,7 +1266,7 @@ def oe_autores(autores: list[str], proponentes: list[dict], data: date | None, s
     for autor in autores:
         sigla = OE_GP_FIXES.get(autor, autor)
         if sigla not in known:
-            _, sigla = _oe_deputado(autor, data, deputados)
+            _, sigla, _ = _oe_deputado(autor, data, deputados)
             sigla = sigla or next((pr['partido'] for pr in proponentes if pr['nome'].lower() == autor.lower()), None)
             if sigla is None:
                 raise TransformError(f"Unknown OE author: '{autor}'")
@@ -1266,7 +1287,7 @@ def oe_parse_votos(votos: list[dict], data: date | None, siglas: dict, deputados
       Rodrigues is "(PAN)" in OE2021, but had been Ninsc since June 2020.
 
     siglas: lower(gp_nome) -> gp_sigla
-    deputados: lower(nome_parlamentar) -> (nome_parlamentar, [(gp_sigla, inicio, fim), ...])
+    deputados: see _oe_deputado
 
     Raises TransformError on an unknown party name or vote, so that a new party fails loudly.
     """
@@ -1283,11 +1304,11 @@ def oe_parse_votos(votos: list[dict], data: date | None, siglas: dict, deputados
             # Seen once (OE2025), with no name: keep it identifiable as non-attached
             parsed[sentido].append('Não Inscrito (Ninsc)')
         elif m := NAMED_RE.match(nome):
-            nome_parl, sigla = _oe_deputado(m[1], data, deputados)
+            nome_parl, sigla, dep_cad_id = _oe_deputado(m[1], data, deputados, m[2])
             if sigla == 'Ninsc':
                 parsed[sentido].append(f"{nome_parl} (Ninsc)")
             else:
-                named.append({'nome': nome_parl, 'partido': m[2], 'sentido': sentido})
+                named.append({'nome': nome_parl, 'partido': m[2], 'sentido': sentido, 'dep_cad_id': dep_cad_id})
         else:
             raise TransformError(f"Unknown party in OE vote: '{nome}'")
     return parsed, named
@@ -1300,9 +1321,9 @@ def oe_rows(propostas: list[dict], ano: int, legislatura: str, siglas: dict, dep
         data_prop = _oe_date(p.get('Data'))
         proponentes = []
         for pr in _as_list((p.get('Proponentes') or {}).get('Proponente')):
-            nome, sigla = _oe_deputado(pr.get('Deputado') or '', data_prop, deputados)
             partido = OE_GP_FIXES.get(pr.get('GP_Partido'), pr.get('GP_Partido'))
-            proponentes.append({'nome': nome, 'partido': 'Ninsc' if sigla == 'Ninsc' else partido})
+            nome, sigla, dep_cad_id = _oe_deputado(pr.get('Deputado') or '', data_prop, deputados, partido)
+            proponentes.append({'nome': nome, 'partido': 'Ninsc' if sigla == 'Ninsc' else partido, 'dep_cad_id': dep_cad_id})
         autores = oe_autores(_split(p.get('GrupoParlamentar_Partido'), ','), proponentes, data_prop, siglas, deputados)
         votacoes = _as_list((p.get('Votacoes') or {}).get('Votacao'))
         prop_rows.append({
@@ -1316,6 +1337,12 @@ def oe_rows(propostas: list[dict], ano: int, legislatura: str, siglas: dict, dep
                 {'artigo': a.get('Artigo'), 'titulo': a.get('Titulo'), 'texto': a.get('Texto'), 'estado': a.get('Estado')}
                 for a in _as_list((p.get('Iniciativas_Artigos') or {}).get('Iniciativa_Artigo'))
             ],
+            # Requests to have the proposta voted in plenary (all "Requerimento de Avocação" in 2020-2027)
+            'requerimentos': [
+                {'data': _oe_date(r.get('Data')), 'titulo': r.get('Titulo'), 'observacoes': r.get('Observacoes'),
+                 'aprovado': {'True': True, 'False': False}.get(r.get('Aprovado')), 'ficheiro': r.get('Ficheiro')}
+                for r in _as_list((p.get('Requerimentos') or {}).get('Requerimento'))
+            ],
             'ficheiro': p.get('Ficheiro'), 'n_votacoes': len(votacoes),
         })
         # The source has no vote ID; votes keep their source order within a proposal
@@ -1328,16 +1355,20 @@ def oe_rows(propostas: list[dict], ano: int, legislatura: str, siglas: dict, dep
             data = _oe_date(v.get('Data'))
             parsed, named = oe_parse_votos(votos, data, siglas, deputados)
             completo = v.get('ResultadoCompleto') or ''
+            resultado = v.get('Resultado')
             vot_rows.append({
                 'vot_id': f"{p['ID']}_{i}", 'prop_id': p['ID'], 'numero': p['Numero'], 'ano': ano,
                 'legislatura': legislatura, 'titulo': p.get('Titulo'), 'tipo': p.get('Tipo'),
-                'autores_gp': autores, 'data': data, 'resultado': v.get('Resultado'),
+                'autores_gp': autores, 'data': data,
+                'resultado': OE_RESULTADOS.get(resultado, resultado), 'resultado_original': resultado,
                 'resultado_completo': v.get('ResultadoCompleto'),
                 'descricao': '; '.join(_as_list((v.get('Descricoes') or {}).get('Descricao'))) or None,
                 'subdescricao': v.get('SubDescricao'),
                 # "Assunção pelo Plenário das votações em Comissão" is plenary, so check that first
                 'tipo_reuniao': 'RP' if 'Plenário' in completo else 'COM' if 'Comissão' in completo else None,
-                'unanime': 'unanime' if 'Unanimidade' in completo + (v.get('Resultado') or '') else None,
+                # From Resultado only: it describes this vote, while ResultadoCompleto sometimes
+                # contradicts it (it seems to be the outcome of the proposta, or part of it)
+                'unanime': 'unanime' if 'Unanimidade' in (resultado or '') else None,
                 'votos': votos, 'detalhe_parsed': parsed if votos else None,
                 'detalhe_deputados': named, 'source': 'oe',
             })
@@ -1386,12 +1417,14 @@ def transform_oe(ano: int) -> tuple[Path, Path] | None:
 
         siglas = {nome.lower(): sigla for sigla, nome in conn.execute(
             f"SELECT gp_sigla, gp_nome FROM '{config.SILVER_DIR}/partidos_{leg}.parquet'").fetchall()}
-        deputados = {
-            nome.lower(): (nome, [(h['gp_sigla'], h['gp_dt_inicio'], h['gp_dt_fim']) for h in historico or []])
-            for nome, historico in conn.execute(
-                f"SELECT nome_parlamentar, partido_historico FROM '{config.SILVER_DIR}/deputados_{leg}.parquet'"
-            ).fetchall()
-        }
+        deputados = {}
+        for nome, dep_cad_id, historico in conn.execute(
+            f"SELECT nome_parlamentar, dep_cad_id, partido_historico FROM '{config.SILVER_DIR}/deputados_{leg}.parquet'"
+        ).fetchall():
+            deputados.setdefault(nome.lower(), []).append((
+                nome, None if dep_cad_id is None else str(int(dep_cad_id)),
+                [(h['gp_sigla'], h['gp_dt_inicio'], h['gp_dt_fim']) for h in historico or []],
+            ))
 
         propostas = json.loads(bronze.read_text(encoding='utf-8-sig'))['PropostaDeAlteracao']
         prop_rows, vot_rows = oe_rows(propostas, ano, legislatura, siglas, deputados)
@@ -1409,6 +1442,57 @@ def transform_oe(ano: int) -> tuple[Path, Path] | None:
     except Exception as e:
         logger.error("transform_oe_error", ano=ano, error=str(e))
         raise TransformError(f"Error transforming OE {ano}: {e}")
+
+
+def transform_oe_orcamentos() -> Path:
+    """
+    oe_orcamentos.parquet: one row per budget bill (config.OE and config.OE_SEM_PROPOSTAS), with its
+    iniciativa and its generalidade and votação final global votes, as they are in the silver
+    iniciativas and votacoes (all legislaturas). A budget still in debate has no final vote yet.
+    """
+    bills = [(ano, oe["legislatura"], oe["ini_id"]) for ano, oe in config.OE.items()]
+    bills += [(oe["ano"], oe["legislatura"], oe["ini_id"]) for oe in config.OE_SEM_PROPOSTAS]
+    path = config.SILVER_DIR / "oe_orcamentos.parquet"
+    try:
+        conn = duckdb.connect()
+        conn.execute("CREATE TABLE bills (ano INTEGER, legislatura VARCHAR, ini_id VARCHAR)")
+        conn.executemany("INSERT INTO bills VALUES (?, ?, ?)", bills)
+        conn.execute(f"""
+            CREATE VIEW votos AS
+            SELECT ini_id, fase, vot_id, data, resultado
+            FROM read_parquet('{config.SILVER_DIR}/votacoes_*.parquet', union_by_name=true)
+            WHERE ini_id IN (SELECT ini_id FROM bills)
+              AND fase IN ('Votação na generalidade', 'Votação final global')
+        """)
+        # Don't pick between votes: more than one per phase needs a look
+        dups = conn.execute("SELECT ini_id, fase FROM votos GROUP BY ALL HAVING count(*) > 1").fetchall()
+        if dups:
+            raise TransformError(f"Budget bills with more than one vote in a phase: {dups}")
+        conn.execute(f"""
+            COPY (
+                SELECT b.ano, b.legislatura, b.ini_id, i.ini_nr, i.ini_titulo,
+                       g.vot_id AS vot_id_generalidade, g.data AS data_generalidade,
+                       g.resultado AS resultado_generalidade,
+                       f.vot_id AS vot_id_final_global, f.data AS data_final_global,
+                       f.resultado AS resultado_final_global
+                FROM bills b
+                LEFT JOIN read_parquet('{config.SILVER_DIR}/iniciativas_*.parquet', union_by_name=true) i
+                       ON i.ini_id = b.ini_id AND i.legislatura = b.legislatura
+                LEFT JOIN votos g ON g.ini_id = b.ini_id AND g.fase = 'Votação na generalidade'
+                LEFT JOIN votos f ON f.ini_id = b.ini_id AND f.fase = 'Votação final global'
+                ORDER BY b.ano DESC, b.legislatura DESC
+            ) TO '{path}' (FORMAT PARQUET, COMPRESSION '{config.PARQUET_COMPRESSION}')
+        """)
+        missing = conn.execute(f"SELECT ini_id FROM '{path}' WHERE ini_nr IS NULL").fetchall()
+        if missing:
+            logger.warning("oe_orcamentos_bill_not_found", ini_ids=missing)
+        logger.info("transform_oe_orcamentos_complete", orcamentos=len(bills))
+        return path
+    except TransformError:
+        raise
+    except Exception as e:
+        logger.error("transform_oe_orcamentos_error", error=str(e))
+        raise TransformError(f"Error transforming oe_orcamentos: {e}")
 
 
 def transform_all(
@@ -1548,6 +1632,13 @@ def transform_all(
 
         if leg_results:
             results[leg] = leg_results
+
+    # Budgets table, from the silver iniciativas/votacoes of all legislaturas
+    if include_oe:
+        try:
+            results.setdefault("OE", {})["oe_orcamentos"] = transform_oe_orcamentos()
+        except TransformError as e:
+            logger.error("transform_oe_orcamentos_failed", error=str(e))
 
     return results
 

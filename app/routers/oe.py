@@ -21,14 +21,18 @@ from app.queries.utils import QueryBuilder, paginated_list, get_one
 router = APIRouter(prefix="/api/v1/oe", tags=["oe"])
 
 ORCAMENTOS = """(
-    SELECT p.*, v.data_ultima_votacao
-    FROM (
+    SELECT o.*, coalesce(p.propostas, 0) AS propostas, coalesce(p.votacoes, 0) AS votacoes,
+           coalesce(p.aprovadas, 0) AS aprovadas, v.data_ultima_votacao
+    FROM oe_orcamentos o
+    LEFT JOIN (
         SELECT ano, legislatura, count(*)::INTEGER AS propostas,
                sum(n_votacoes)::INTEGER AS votacoes,
-               (count(*) FILTER (WHERE estado ILIKE 'Aprovad%'))::INTEGER AS aprovadas
+               (count(*) FILTER (WHERE estado LIKE 'Aprovado(a)%'))::INTEGER AS aprovadas
         FROM oe_propostas GROUP BY ano, legislatura
-    ) p
-    LEFT JOIN (SELECT ano, max(data) AS data_ultima_votacao FROM oe_votacoes GROUP BY ano) v USING (ano)
+    ) p USING (ano, legislatura)
+    LEFT JOIN (
+        SELECT ano, legislatura, max(data) AS data_ultima_votacao FROM oe_votacoes GROUP BY ano, legislatura
+    ) v USING (ano, legislatura)
 ) AS orcamentos"""
 
 ANO = Query(None, ge=2000, description="Budget year (e.g. 2027 for OE2027)")
@@ -41,10 +45,13 @@ def list_orcamentos(
     offset: int = Query(0, ge=0),
     db: duckdb.DuckDBPyConnection = Depends(get_db)
 ):
-    """List the State Budgets available, with totals of propostas, votes and approved propostas."""
+    """
+    List the State Budget bills, with their generalidade and votação final global votes and the
+    totals of propostas de alteração, votes and approved propostas.
+    """
     limit, offset = validate_pagination(limit, offset)
     qb = QueryBuilder().add_equals("legislatura", validate_legislatura(legislatura))
-    return paginated_list(db, ORCAMENTOS, qb, Orcamento, "ano DESC", limit, offset)
+    return paginated_list(db, ORCAMENTOS, qb, Orcamento, "ano DESC, legislatura DESC", limit, offset)
 
 
 @router.get("/propostas/", response_model=APIResponse[PropostaListItem])
@@ -89,7 +96,7 @@ def list_oe_votacoes(
     legislatura: str | None = Query(None, description="Filter by legislature (L14 ... L17)"),
     prop_id: str | None = Query(None, description="Filter by proposta ID"),
     autor_gp: str | None = Query(None, description="Filter by author party of the proposta. Case-insensitive."),
-    resultado: str | None = Query(None, description="Result, substring match (e.g. 'aprovado', 'rejeitado')"),
+    resultado: str | None = Query(None, description="Result: Aprovado, Rejeitado or Prejudicado (substring match, case-insensitive)"),
     tipo_reuniao: str | None = Query(None, description="Comma-separated: COM (committee), RP (plenary). Default: all."),
     partido_favor: str | None = Query(None, description="Filter by party voting in favor. Case-insensitive."),
     partido_contra: str | None = Query(None, description="Filter by party voting against. Case-insensitive."),

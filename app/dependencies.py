@@ -24,6 +24,7 @@ OPTIONAL_VIEWS = {
     "cap": "cap_l*.parquet",
     "oe_propostas": "oe_propostas_*.parquet",
     "oe_votacoes": "oe_votacoes_*.parquet",
+    "oe_orcamentos": "oe_orcamentos.parquet",
 }
 
 

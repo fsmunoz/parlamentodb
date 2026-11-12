@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from etl.transform import TransformError, _as_list, _oe_date, oe_autores, oe_parse_votos
+from etl.transform import TransformError, _as_list, _oe_date, _oe_deputado, oe_autores, oe_parse_votos
 
 client = TestClient(app)
 
@@ -24,9 +24,12 @@ client = TestClient(app)
 
 SIGLAS = {'partido socialista': 'PS', 'partido social democrata': 'PSD', 'pessoas-animais-natureza': 'PAN'}
 DEPUTADOS = {
-    'cristina rodrigues': ('Cristina Rodrigues', [('PAN', date(2019, 10, 25), date(2020, 6, 24)),
-                                                  ('Ninsc', date(2020, 6, 25), date(2022, 3, 28))]),
-    'sara madruga da costa': ('Sara Madruga da Costa', [('PSD', date(2019, 10, 25), None)]),
+    'cristina rodrigues': [('Cristina Rodrigues', '6547', [('PAN', date(2019, 10, 25), date(2020, 6, 24)),
+                                                           ('Ninsc', date(2020, 6, 25), date(2022, 3, 28))])],
+    'sara madruga da costa': [('Sara Madruga da Costa', '1', [('PSD', date(2019, 10, 25), None)])],
+    # Two deputies with the same name in one legislature
+    'jorge pinto': [('Jorge Pinto', '10', [('PS', date(2024, 3, 26), None)]),
+                    ('Jorge Pinto', '20', [('L', date(2024, 3, 26), None)])],
 }
 
 
@@ -45,11 +48,19 @@ def test_parse_votos_parties_ninsc_and_dissenters():
     parsed, named = oe_parse_votos(votos, date(2020, 11, 24), SIGLAS, DEPUTADOS)
     # Non-attached on the vote date: kept with the parties, as in parse_detalhe
     assert parsed == {'a_favor': ['PS'], 'contra': ['PSD'], 'abstencao': [], 'ausencia': ['Cristina Rodrigues (Ninsc)']}
-    assert named == [{'nome': 'Sara Madruga da Costa', 'partido': 'PSD', 'sentido': 'abstencao'}]
+    assert named == [{'nome': 'Sara Madruga da Costa', 'partido': 'PSD', 'sentido': 'abstencao', 'dep_cad_id': '1'}]
 
     # Before leaving PAN she is a named deputy, not Ninsc
     _, named = oe_parse_votos(votos[3:], date(2020, 2, 4), SIGLAS, DEPUTADOS)
-    assert named == [{'nome': 'Cristina Rodrigues', 'partido': 'PAN', 'sentido': 'ausencia'}]
+    assert named == [{'nome': 'Cristina Rodrigues', 'partido': 'PAN', 'sentido': 'ausencia', 'dep_cad_id': '6547'}]
+
+
+def test_same_name_deputies_resolved_by_party_or_left_unmatched():
+    day = date(2025, 1, 1)
+    assert _oe_deputado('JORGE PINTO', day, DEPUTADOS, 'L') == ('Jorge Pinto', 'L', '20')
+    assert _oe_deputado('JORGE PINTO', day, DEPUTADOS, 'PS') == ('Jorge Pinto', 'PS', '10')
+    assert _oe_deputado('JORGE PINTO', day, DEPUTADOS) == ('Jorge Pinto', None, None)
+    assert _oe_deputado('NINGUÉM', day, DEPUTADOS) == ('Ninguém', None, None)
 
 
 def test_parse_votos_rejects_unknown_party_and_vote():
@@ -81,7 +92,7 @@ APROVADAS = {2022: 141, 2023: 146, 2024: 206, 2025: 248}
 @pytest.fixture(scope="module")
 def orcamentos():
     body = client.get("/api/v1/oe/").json()
-    return {o["ano"]: o for o in body["data"]}
+    return {o["ano"]: o for o in body["data"] if o["propostas"]}
 
 
 @pytest.mark.parametrize("ano", KNOWN)
@@ -108,7 +119,7 @@ def test_known_vote():
     """2076C (OE2026, L): approved in committee, 21/11/2025."""
     vote = client.get("/api/v1/oe/votacoes/25333_1").json()
     assert vote["numero"] == "2076C" and vote["data"] == "2025-11-21" and vote["tipo_reuniao"] == "COM"
-    assert vote["autores_gp"] == ["L"] and vote["resultado"] == "Aprovado(a)"
+    assert vote["autores_gp"] == ["L"] and vote["resultado"] == "Aprovado" and vote["resultado_original"] == "Aprovado(a)"
     assert vote["detalhe_parsed"] == {
         "a_favor": ["CH", "IL", "L", "PCP", "BE", "PAN"], "contra": [], "abstencao": ["PSD", "PS", "CDS-PP"], "ausencia": [],
     }
@@ -123,7 +134,9 @@ def test_ninsc_and_regional_deputies():
 
     dissent = client.get("/api/v1/oe/votacoes/13298_1").json()  # 151C, 20/11/2020
     assert "PSD" in dissent["detalhe_parsed"]["abstencao"]
-    assert dissent["detalhe_deputados"] == [{"nome": "Sara Madruga da Costa", "partido": "PSD", "sentido": "a_favor"}]
+    [deputado] = dissent["detalhe_deputados"]
+    assert (deputado["nome"], deputado["partido"], deputado["sentido"]) == ("Sara Madruga da Costa", "PSD", "a_favor")
+    assert client.get(f"/api/v1/deputados/{deputado['dep_cad_id']}?legislatura=L14").json()["nome_parlamentar"] == "Sara Madruga da Costa"
 
 
 # --- Filters ---------------------------------------------------------------------------------
@@ -156,3 +169,35 @@ def test_party_codes_with_one_letter_or_hyphen_accepted():
     for code in ("L", "cds-pp"):
         assert client.get(f"/api/v1/iniciativas/votacoes/?partido_favor={code}&limit=1").status_code == 200
     assert client.get("/api/v1/iniciativas/votacoes/?partido_favor=P$D&limit=1").status_code == 400
+
+
+def test_resultado_uses_votacoes_vocabulary_and_unanimity_from_resultado():
+    """resultado is Aprovado/Rejeitado/Prejudicado as in votacoes; the source value stays in resultado_original."""
+    for valor in ("Aprovado", "Rejeitado", "Prejudicado"):
+        assert client.get(f"/api/v1/oe/votacoes/?resultado={valor}&limit=1").json()["pagination"]["total"] > 0
+    body = client.get("/api/v1/oe/votacoes/?ano=2025&resultado=aprovado&limit=500").json()
+    assert {v["resultado"] for v in body["data"]} == {"Aprovado"}
+    unanimous = [client.get(f"/api/v1/oe/votacoes/{v['vot_id']}").json() for v in body["data"][:200]]
+    for v in unanimous:
+        assert (v["unanime"] == "unanime") == ("Unanimidade" in v["resultado_original"])
+
+
+def test_requerimentos_de_avocacao():
+    """The source's avocação requests are kept as they are."""
+    proposta = client.get("/api/v1/oe/propostas/13097").json()  # OE2020
+    [req] = proposta["requerimentos"]
+    assert req["titulo"].startswith("Requerimento de Avocação do PCP") and req["aprovado"] is True
+    assert req["data"] == "2020-02-05" and req["ficheiro"].startswith("http")
+
+
+def test_orcamentos_bills():
+    """Each budget links to its bill and its generalidade / final global votes."""
+    rows = {(o["ano"], o["legislatura"]): o for o in client.get("/api/v1/oe/").json()["data"]}
+    oe2026 = rows[(2026, "L17")]
+    assert (oe2026["ini_id"], oe2026["ini_nr"]) == ("315671", "37")
+    assert (oe2026["data_final_global"], oe2026["resultado_final_global"]) == ("2025-11-27", "Aprovado")
+    assert client.get(f"/api/v1/iniciativas/votacoes/{oe2026['vot_id_final_global']}").status_code == 200
+
+    rejected = rows[(2022, "L14")]  # rejected on generalidade, no propostas
+    assert rejected["resultado_generalidade"] == "Rejeitado" and rejected["data_final_global"] is None
+    assert rejected["propostas"] == 0 and rows[(2022, "L15")]["propostas"] == KNOWN[2022][0]
