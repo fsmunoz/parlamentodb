@@ -305,34 +305,38 @@ def test_ini_id_is_unique_identifier():
 # =============================================================================
 
 
-def test_atividades_l17_count_307():
-    """
-    REGRESSION: L17 should have exactly 307 atividades.
+def _silver_count(name: str) -> int:
+    """Row count of a silver Parquet file (the API totals must match it)."""
+    import duckdb
+    import config
+    return duckdb.sql(f"SELECT count(*) FROM '{config.SILVER_DIR / name}'").fetchone()[0]
 
-    This is a known constant from the atividades dataset transformation.
-    Validates ETL data integrity.
+
+def test_atividades_l17_count_matches_silver():
+    """
+    REGRESSION: the API returns every L17 atividade in silver, no more, no less.
+
+    Compared with the Parquet row count instead of a hard-coded number, since
+    the source grows during the legislature.
     """
     response = client.get("/api/v1/atividades/?legislatura=L17&limit=500")
     assert response.status_code == 200
 
-    data = response.json()
-    assert data["pagination"]["total"] == 307, \
-        f"Expected 307 atividades in L17, got {data['pagination']['total']}"
+    total = response.json()["pagination"]["total"]
+    assert total > 0, "Should have atividades in L17"
+    assert total == _silver_count("atividades_l17.parquet")
 
 
-def test_atividades_votes_l17_count_77():
+def test_atividades_votes_l17_count_matches_silver():
     """
-    REGRESSION: L17 should have exactly 77 votes from atividades.
-
-    This is a known constant from the atividades_votacoes transformation.
-    Validates vote extraction accuracy.
+    REGRESSION: the API returns every L17 atividade vote in silver.
     """
     response = client.get("/api/v1/atividades/votacoes/?legislatura=L17&limit=500")
     assert response.status_code == 200
 
-    data = response.json()
-    assert data["pagination"]["total"] == 77, \
-        f"Expected 77 atividades votes in L17, got {data['pagination']['total']}"
+    total = response.json()["pagination"]["total"]
+    assert total > 0, "Should have atividades votes in L17"
+    assert total == _silver_count("atividades_votacoes_l17.parquet")
 
 
 def test_has_party_details_implies_detalhe_not_null():
@@ -423,9 +427,7 @@ def test_vote_source_breakdown_sum_correct():
     assert breakdown["total"] == expected_total, \
         f"vote_source_breakdown total mismatch: {breakdown['total']} != {expected_total}"
 
-    # For L17, we know atividades should be 77
-    assert breakdown["atividades"] == 77, \
-        f"L17 should have 77 atividades votes, got {breakdown['atividades']}"
+    assert breakdown["atividades"] == _silver_count("atividades_votacoes_l17.parquet")
 
 
 def test_atividades_synthetic_id_format():
@@ -454,6 +456,25 @@ def test_atividades_synthetic_id_format():
         # Must not be empty after prefix
         assert len(ativ_id) > len("L17_"), \
             f"Activity ID too short: {ativ_id}"
+
+
+@pytest.mark.parametrize("leg", ["l13", "l14", "l15", "l16", "l17"])
+def test_atividades_ids_unique_no_empty_rows(leg):
+    """
+    REGRESSION: ativ_id is unique and there are no all-null rows.
+
+    Moções de rejeição and de censura share Tipo MOC with separate numbering
+    (L17 had two L17_MOC_1), and the source has all-null placeholders that
+    became L17_<md5('')> rows. See etl/transform.py transform_atividades.
+    """
+    import duckdb
+    import config
+    path = config.SILVER_DIR / f"atividades_{leg}.parquet"
+    dups, empty = duckdb.sql(
+        f"SELECT count(*) - count(DISTINCT ativ_id), count(*) FILTER (ativ_tipo IS NULL) FROM '{path}'"
+    ).fetchone()
+    assert dups == 0, f"{dups} duplicate ativ_id in {leg}"
+    assert empty == 0, f"{empty} rows with null ativ_tipo in {leg}"
 
 
 def test_atividades_filter_by_tipo_correctness():

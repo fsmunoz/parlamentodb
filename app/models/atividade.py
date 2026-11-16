@@ -30,7 +30,7 @@ class AtividadeListItem(BaseModel):
     ativ_numero: str | None = Field(None, description="Activity number (can be null)")
     ativ_assunto: str | None = Field(None, description="Activity subject/title")
     data_entrada: date | None = Field(None, description="Entry/submission date")
-    ativ_autores_gp: list[str] | None = Field(None, description="Array of party authors")
+    ativ_autores_gp: list[str] | None = Field(None, description="Authors as listed by AR: group siglas, deputados as \"Nome (GP)\", PAR, committees")
     has_votes: bool = Field(False, description="True if votacao_debate array is non-empty")
 
     model_config = {
@@ -66,7 +66,7 @@ class Atividade(BaseModel):
     data_entrada: date | None = Field(None, description="Entry/submission date")
     data_agendamento_debate: date | None = Field(None, description="Scheduled debate date")
     data_anuncio: date | None = Field(None, description="Announcement date")
-    ativ_autores_gp: list[str] | None = Field(None, description="Array of party authors")
+    ativ_autores_gp: list[str] | None = Field(None, description="Authors as listed by AR: group siglas, deputados as \"Nome (GP)\", PAR, committees")
     ativ_tipo_autor: str | None = Field(None, description="Author type (e.g., 'Grupos Parlamentares')")
     sessao: str | None = Field(None, description="Session")
     observacoes: str | None = Field(None, description="Observations/notes")

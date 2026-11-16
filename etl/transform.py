@@ -815,16 +815,28 @@ def transform_atividades(
                         maximum_object_size=16777216
                     )
                 ),
+                -- DISTINCT: the source repeats a few records verbatim (L13 OEX, L16 SES)
                 atividades_array AS (
-                    SELECT UNNEST(AtividadesGerais.Atividades) as ativ
+                    SELECT DISTINCT UNNEST(AtividadesGerais.Atividades) as ativ
                     FROM atividades_gerais
                     WHERE AtividadesGerais.Atividades IS NOT NULL
+                ),
+                -- The source has placeholder records with every field null; drop them.
+                -- Moções de rejeição and de censura share Tipo MOC but are numbered
+                -- separately, so (Tipo, Numero) is not unique: count repeats.
+                atividades_valid AS (
+                    SELECT ativ, count(*) OVER (PARTITION BY ativ.Tipo, ativ.Numero) AS n_same
+                    FROM atividades_array
+                    WHERE ativ.Tipo IS NOT NULL
                 )
                 SELECT
-                    -- Generate synthetic ID (composite key or hash)
+                    -- Synthetic ID: composite key, plus an Assunto hash when the key repeats;
+                    -- hash only when there is no Numero
                     CASE
-                        WHEN ativ.Numero IS NOT NULL
+                        WHEN ativ.Numero IS NOT NULL AND n_same = 1
                         THEN '{legislature}_' || ativ.Tipo || '_' || ativ.Numero
+                        WHEN ativ.Numero IS NOT NULL
+                        THEN '{legislature}_' || ativ.Tipo || '_' || ativ.Numero || '_' || left(MD5(COALESCE(ativ.Assunto, '')), 8)
                         ELSE '{legislature}_' || MD5(COALESCE(ativ.Assunto, '') || COALESCE(CAST(ativ.DataEntrada AS VARCHAR), ''))
                     END as ativ_id,
                     ativ.Assunto as ativ_assunto,
@@ -836,6 +848,7 @@ def transform_atividades(
                     ativ.DataAgendamentoDebate as data_agendamento_debate,
                     ativ.DataAnuncio as data_anuncio,
                     ativ.AutoresGP as ativ_autores_gp,
+                    ativ.OutrosSubscritores::VARCHAR[] as ativ_outros_subscritores,
                     ativ.TipoAutor as ativ_tipo_autor,
                     ativ.Publicacao as publicacao,
                     ativ.PublicacaoDebate as publicacao_debate,
@@ -844,7 +857,7 @@ def transform_atividades(
                     ativ.Observacoes as observacoes,
                     '{legislature}' as legislatura,
                     CURRENT_TIMESTAMP as etl_timestamp
-                FROM atividades_array
+                FROM atividades_valid
                 ORDER BY data_entrada DESC NULLS LAST
             ) TO '{silver_path}' (
                 FORMAT PARQUET,
