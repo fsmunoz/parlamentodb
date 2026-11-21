@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software or the API it serves, please cite it as below."
+type: software
+title: "ParlamentoDB: ETL and REST API for Portuguese Parliament open data"
+authors:
+  - family-names: "Muñoz"
+    given-names: "Frederico"
+    orcid: "https://orcid.org/0009-0000-9488-3542"
+repository-code: "https://github.com/fsmunoz/parlamentodb"
+url: "https://api.votoaberto.org"
+license: AGPL-3.0-only
+keywords:
+  - Portugal
+  - parliament
+  - Assembleia da República
+  - open data
+  - votes
+  - API
+references:
+  - type: data
+    title: "Dados Abertos do Parlamento"
+    authors:
+      - name: "Assembleia da República"
+    url: "https://www.parlamento.pt/Cidadania/Paginas/DadosAbertos.aspx"
+    notes: "Source of all underlying parliamentary data. ParlamentoDB republishes it in normalised form and does not claim it as its own."
