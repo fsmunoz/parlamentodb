@@ -15,7 +15,9 @@ BindReadOnlyPaths=/home/fsmunoz/src/parlamentodb
 EnvironmentFile=/home/fsmunoz/src/parlamentodb/.env
 Environment=HOME=/tmp
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/home/fsmunoz/src/parlamentodb/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+# One worker: each took about 800 MB, and two were killed by MemoryMax six times
+# on 2026-11-09. The host's CPU is idle, so a second worker gained nothing.
+ExecStart=/home/fsmunoz/src/parlamentodb/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
 RestartSec=5
 MemoryMax=1500M
