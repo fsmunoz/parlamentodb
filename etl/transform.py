@@ -1552,6 +1552,12 @@ def transform_all(
         legislatures = list(config.LEGISLATURES.keys())
 
     results = {}
+    failed = []
+
+    def fail(event: str, **kw) -> None:
+        failed.append(f"{event} {kw}")
+        logger.error(event, **kw)
+
     for leg in legislatures:
         leg_results = {}
 
@@ -1559,7 +1565,7 @@ def transform_all(
         try:
             leg_results["iniciativas"] = transform_legislature(leg)
         except TransformError as e:
-            logger.error("transform_iniciativas_failed", legislature=leg, error=str(e))
+            fail("transform_iniciativas_failed", legislature=leg, error=str(e))
 
         # Transform info_base
         if include_info_base:
@@ -1568,35 +1574,35 @@ def transform_all(
                 if info_base_path:
                     leg_results["info_base"] = info_base_path
             except TransformError as e:
-                logger.error("transform_info_base_failed", legislature=leg, error=str(e))
+                fail("transform_info_base_failed", legislature=leg, error=str(e))
 
         # Transform votacoes (requires iniciativas to exist)
         if include_votacoes and "iniciativas" in leg_results:
             try:
                 leg_results["votacoes"] = transform_votacoes(leg)
             except TransformError as e:
-                logger.error("transform_votacoes_failed", legislature=leg, error=str(e))
+                fail("transform_votacoes_failed", legislature=leg, error=str(e))
 
         # Transform deputados (requires info_base to exist)
         if include_deputados and "info_base" in leg_results:
             try:
                 leg_results["deputados"] = transform_deputados(leg)
             except TransformError as e:
-                logger.error("transform_deputados_failed", legislature=leg, error=str(e))
+                fail("transform_deputados_failed", legislature=leg, error=str(e))
 
         # Transform circulos (requires info_base to exist)
         if include_circulos and "info_base" in leg_results:
             try:
                 leg_results["circulos"] = transform_circulos(leg)
             except TransformError as e:
-                logger.error("transform_circulos_failed", legislature=leg, error=str(e))
+                fail("transform_circulos_failed", legislature=leg, error=str(e))
 
         # Transform partidos (requires info_base to exist)
         if include_partidos and "info_base" in leg_results:
             try:
                 leg_results["partidos"] = transform_partidos(leg)
             except TransformError as e:
-                logger.error("transform_partidos_failed", legislature=leg, error=str(e))
+                fail("transform_partidos_failed", legislature=leg, error=str(e))
 
         # Transform the OE budgets debated in this legislature (needs partidos and deputados)
         if include_oe:
@@ -1606,7 +1612,7 @@ def transform_all(
                     if paths:
                         leg_results[f"oe_propostas_{ano}"], leg_results[f"oe_votacoes_{ano}"] = paths
                 except TransformError as e:
-                    logger.error("transform_oe_failed", ano=ano, error=str(e))
+                    fail("transform_oe_failed", ano=ano, error=str(e))
 
         # Transform atividades
         if include_atividades:
@@ -1615,7 +1621,7 @@ def transform_all(
                 if atividades_path:
                     leg_results["atividades"] = atividades_path
             except TransformError as e:
-                logger.error("transform_atividades_failed", legislature=leg, error=str(e))
+                fail("transform_atividades_failed", legislature=leg, error=str(e))
 
             for name in ATIVIDADES_SECTIONS:
                 try:
@@ -1623,7 +1629,7 @@ def transform_all(
                     if path:
                         leg_results[name] = path
                 except TransformError as e:
-                    logger.error("transform_atividades_section_failed", legislature=leg, section=name, error=str(e))
+                    fail("transform_atividades_section_failed", legislature=leg, section=name, error=str(e))
 
         # Transform atividades_votacoes (requires atividades to exist)
         if include_atividades_votacoes and "atividades" in leg_results:
@@ -1632,7 +1638,7 @@ def transform_all(
                 if atividades_votacoes_path:
                     leg_results["atividades_votacoes"] = atividades_votacoes_path
             except TransformError as e:
-                logger.error("transform_atividades_votacoes_failed", legislature=leg, error=str(e))
+                fail("transform_atividades_votacoes_failed", legislature=leg, error=str(e))
 
         # Transform CAP mapping (optional - skipped silently if source CSV absent)
         if include_cap:
@@ -1641,7 +1647,7 @@ def transform_all(
                 if cap_path:
                     leg_results["cap"] = cap_path
             except TransformError as e:
-                logger.error("transform_cap_failed", legislature=leg, error=str(e))
+                fail("transform_cap_failed", legislature=leg, error=str(e))
 
         if leg_results:
             results[leg] = leg_results
@@ -1651,7 +1657,12 @@ def transform_all(
         try:
             results.setdefault("OE", {})["oe_orcamentos"] = transform_oe_orcamentos()
         except TransformError as e:
-            logger.error("transform_oe_orcamentos_failed", error=str(e))
+            fail("transform_oe_orcamentos_failed", error=str(e))
+
+    # Fail after doing everything else, so make and the systemd timer stop
+    # before restarting the API.
+    if failed:
+        raise TransformError(f"{len(failed)} transform(s) failed: {failed}")
 
     return results
 
@@ -1739,18 +1750,22 @@ if __name__ == "__main__":
         print("==> Transforming all legislatures")
 
     # Call transform_all with parsed arguments
-    results = transform_all(
-        legislatures=legislatures,
-        include_info_base=not args.skip_info_base,
-        include_votacoes=not args.skip_votacoes,
-        include_deputados=not args.skip_deputados,
-        include_circulos=not args.skip_circulos,
-        include_partidos=not args.skip_partidos,
-        include_atividades=not args.skip_atividades,
-        include_atividades_votacoes=not args.skip_atividades_votacoes,
-        include_cap=not args.skip_cap,
-        include_oe=not args.skip_oe,
-    )
+    try:
+        results = transform_all(
+            legislatures=legislatures,
+            include_info_base=not args.skip_info_base,
+            include_votacoes=not args.skip_votacoes,
+            include_deputados=not args.skip_deputados,
+            include_circulos=not args.skip_circulos,
+            include_partidos=not args.skip_partidos,
+            include_atividades=not args.skip_atividades,
+            include_atividades_votacoes=not args.skip_atividades_votacoes,
+            include_cap=not args.skip_cap,
+            include_oe=not args.skip_oe,
+        )
+    except TransformError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     print(f"==> Transform completed. Results: {len(results)} legislatures processed")
     for leg, paths in results.items():

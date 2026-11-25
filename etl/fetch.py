@@ -6,6 +6,8 @@ Frederico Muñoz <fsmunoz@gmail.com>
 Downloads JSON data from the parlamento.pt site with some retry logic and validation.
 """
 
+import json
+
 import httpx
 import structlog
 from pathlib import Path
@@ -19,13 +21,79 @@ class FetchError(Exception):
     """Raised when fetch operation fails."""
     pass
 
+
+def _vote_ids(ini: dict) -> set:
+    """IDs of the plenary and committee votes in one iniciativa."""
+    ids = set()
+    for ev in ini.get("IniEventos") or []:
+        ids |= {v.get("id") for v in ev.get("Votacao") or []}
+        for com in ev.get("Comissao") or []:
+            ids |= {v.get("id") for v in com.get("Votacao") or []}
+    return ids
+
+
+def merge_iniciativas(old: list[dict], new: list[dict]) -> tuple[list[dict], int]:
+    """Merge a new upstream iniciativas file onto the previous bronze, by IniId.
+
+    
+    Upstream wins for every record it has: records missing upstream
+    are carried forward. Since (at least) Nov 2026 the parlamento.pt
+    export intermittently drops whole sessions (IniSel) while the
+    records it does include stay complete, so a plain overwrite would
+    delete history. If a record that is present lost votes, that is a
+    new failure mode: refuse the file instead of trying to be smart
+    about it.
+
+    Returns (merged records, number carried forward).
+
+    """
+    new_ids = {x["IniId"] for x in new}
+    carried = [x for x in old if x["IniId"] not in new_ids]
+    old_votes = set().union(*map(_vote_ids, old))
+    new_votes = set().union(*map(_vote_ids, new + carried))
+    lost = old_votes - new_votes
+    if lost:
+        raise FetchError(f"Upstream file would lose {len(lost)} votes, e.g. {sorted(map(str, lost))[:5]}")
+    return new + carried, len(carried)
+
+
+def _section_sizes(data: dict) -> dict[str, int]:
+    """Non-empty records per list in a dict-shaped file, one level deep
+    (e.g. Debates, AtividadesGerais.Atividades). A record whose fields are
+    all null counts as empty: the broken export leaves one such placeholder."""
+    def count(xs: list) -> int:
+        return sum(1 for x in xs if not isinstance(x, dict) or any(v is not None for v in x.values()))
+    sizes = {}
+    for k, v in data.items():
+        if isinstance(v, list):
+            sizes[k] = count(v)
+        elif isinstance(v, dict):
+            sizes |= {f"{k}.{k2}": count(v2) for k2, v2 in v.items() if isinstance(v2, list)}
+    return sizes
+
+
+def check_shrink(path: Path, new: dict) -> None:
+    """
+    Refuse an upstream file whose record lists shrank by more than 10% against
+    the current bronze (Nov 2026: L14 Debates went 326 -> 1 empty record).
+    Small drops pass, so a legitimately removed record doesn't block updates.
+    """
+    if not path.exists():
+        return
+    old = _section_sizes(json.loads(path.read_text(encoding="utf-8-sig")))
+    now = _section_sizes(new)
+    shrunk = {k: f"{n} -> {now.get(k, 0)}" for k, n in old.items() if now.get(k, 0) < 0.9 * n}
+    if shrunk:
+        raise FetchError(f"Upstream file shrank, keeping {path.name}: {shrunk}")
+
 # When to retry...
 # 
 # CHeck https://tenacity.readthedocs.io/en/latest for the tenacity API,
 # it uses a @retry decorator
 @retry(
     stop=stop_after_attempt(config.FETCH_RETRIES),
-    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY)
+    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY),
+    reraise=True,  # raise the FetchError itself, not tenacity's RetryError
 )
 def fetch_legislature(legislature: str, force: bool = False) -> Path:
     """
@@ -76,8 +144,16 @@ def fetch_legislature(legislature: str, force: bool = False) -> Path:
             if not isinstance(data, list):
                 raise FetchError(f"Expected list, got {type(data)}")
 
+            # Keep records the export dropped (see merge_iniciativas)
+            if output_path.exists():
+                old = json.loads(output_path.read_text(encoding="utf-8-sig"))
+                upstream = len(data)
+                data, carried = merge_iniciativas(old, data)
+                logger.info("merged", legislature=legislature, upstream=upstream,
+                            previous=len(old), carried_forward=carried)
+
             # ... and write to a tmp file...
-            temp_path.write_text(response.text, encoding="utf-8")
+            temp_path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
             # ...and rename.
             temp_path.rename(output_path)
@@ -106,7 +182,8 @@ def fetch_legislature(legislature: str, force: bool = False) -> Path:
 
 @retry(
     stop=stop_after_attempt(config.FETCH_RETRIES),
-    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY)
+    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY),
+    reraise=True,  # raise the FetchError itself, not tenacity's RetryError
 )
 def fetch_info_base(legislature: str, force: bool = False) -> Path | None:
     """
@@ -171,6 +248,7 @@ def fetch_info_base(legislature: str, force: bool = False) -> Path | None:
                 logger.warning("missing_keys", keys=missing_keys)
 
             # Write to tmp file
+            check_shrink(output_path, data)
             temp_path.write_text(response.text, encoding="utf-8")
 
             # Atomic rename
@@ -199,7 +277,8 @@ def fetch_info_base(legislature: str, force: bool = False) -> Path | None:
 
 @retry(
     stop=stop_after_attempt(config.FETCH_RETRIES),
-    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY)
+    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY),
+    reraise=True,  # raise the FetchError itself, not tenacity's RetryError
 )
 def fetch_atividades(legislature: str, force: bool = False) -> Path | None:
     """
@@ -264,6 +343,7 @@ def fetch_atividades(legislature: str, force: bool = False) -> Path | None:
                 logger.warning("missing_atividades_array", legislature=legislature)
 
             # Write to temp file
+            check_shrink(output_path, data)
             temp_path.write_text(response.text, encoding="utf-8")
 
             # Atomic rename
@@ -293,7 +373,8 @@ def fetch_atividades(legislature: str, force: bool = False) -> Path | None:
 
 @retry(
     stop=stop_after_attempt(config.FETCH_RETRIES),
-    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY)
+    wait=wait_exponential(multiplier=config.FETCH_RETRY_DELAY),
+    reraise=True,  # raise the FetchError itself, not tenacity's RetryError
 )
 def fetch_oe(ano: int, force: bool = False) -> Path:
     """
@@ -315,6 +396,7 @@ def fetch_oe(ano: int, force: bool = False) -> Path:
             data = response.json()
             if not isinstance(data, dict) or "PropostaDeAlteracao" not in data:
                 raise FetchError(f"Expected {{'PropostaDeAlteracao': [...]}}, got {type(data)}")
+            check_shrink(output_path, data)
             temp_path.write_text(response.text, encoding="utf-8")
             temp_path.rename(output_path)
             logger.info("fetch_oe_complete", ano=ano, propostas=len(data["PropostaDeAlteracao"]))
@@ -354,6 +436,12 @@ def fetch_all(
         legislatures = list(config.LEGISLATURES.keys())
 
     results = {}
+    failed = []
+
+    def fail(event: str, **kw) -> None:
+        failed.append(f"{event} {kw}")
+        logger.error(event, **kw)
+
     for leg in legislatures:
         leg_results = {}
 
@@ -361,21 +449,21 @@ def fetch_all(
         try:
             leg_results["iniciativas"] = fetch_legislature(leg, force=force)
         except FetchError as e:
-            logger.error("fetch_iniciativas_failed", legislature=leg, error=str(e))
+            fail("fetch_iniciativas_failed", legislature=leg, error=str(e))
 
         # Fetch info_base
         if include_info_base:
             try:
                 leg_results["info_base"] = fetch_info_base(leg, force=force)
             except FetchError as e:
-                logger.error("fetch_info_base_failed", legislature=leg, error=str(e))
+                fail("fetch_info_base_failed", legislature=leg, error=str(e))
 
         # Fetch atividades
         if include_atividades:
             try:
                 leg_results["atividades"] = fetch_atividades(leg, force=force)
             except FetchError as e:
-                logger.error("fetch_atividades_failed", legislature=leg, error=str(e))
+                fail("fetch_atividades_failed", legislature=leg, error=str(e))
 
         # Fetch the OE budgets debated in this legislature
         if include_oe:
@@ -383,9 +471,14 @@ def fetch_all(
                 try:
                     leg_results[f"oe_{ano}"] = fetch_oe(ano, force=force)
                 except FetchError as e:
-                    logger.error("fetch_oe_failed", ano=ano, error=str(e))
+                    fail("fetch_oe_failed", ano=ano, error=str(e))
 
         if leg_results:
             results[leg] = leg_results
+
+    # Everything else was still fetched; fail now so the caller (make, the
+    # systemd timer) stops before transform and leaves the running API alone.
+    if failed:
+        raise FetchError(f"{len(failed)} fetch(es) failed: {failed}")
 
     return results

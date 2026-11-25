@@ -92,8 +92,11 @@ OE_SEM_PROPOSTAS: list[dict[str, str | int]] = [
 
 # HTTP settings
 FETCH_TIMEOUT = 60
-FETCH_RETRIES = 3
-FETCH_RETRY_DELAY = 2  # seconds
+# parlamento.pt sometimes serves a NotFound.html page (HTTP 200) for a minute or
+# two; exponential waits of 30, 60, 120, 240s to try and get a response
+# FSM: this was particularly noticeable in Nov 2026.
+FETCH_RETRIES = 5
+FETCH_RETRY_DELAY = 30  # seconds, doubled per attempt
 USER_AGENT = "ParlamentoDB-ETL/0.1.0"
 
 # DuckDB settings

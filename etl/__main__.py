@@ -10,7 +10,7 @@ Usage:
 import argparse
 import sys
 
-from etl.fetch import fetch_all
+from etl.fetch import FetchError, fetch_all
 import config
 
 
@@ -71,13 +71,17 @@ def main():
         print("==> Fetching all legislatures")
 
     # Call fetch_all with parsed arguments
-    results = fetch_all(
-        legislatures=legislatures,
-        include_info_base=not args.skip_info_base,
-        include_atividades=not args.skip_atividades,
-        include_oe=not args.skip_oe,
-        force=not args.no_force
-    )
+    try:
+        results = fetch_all(
+            legislatures=legislatures,
+            include_info_base=not args.skip_info_base,
+            include_atividades=not args.skip_atividades,
+            include_oe=not args.skip_oe,
+            force=not args.no_force
+        )
+    except FetchError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Display results
     print(f"==> Fetch completed. Results: {len(results)} legislatures processed")
